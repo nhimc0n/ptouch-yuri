@@ -96,6 +96,10 @@ jobs:
       if: runner.os == 'Windows'
       run: cargo clippy --workspace --all-targets --all-features --locked --target ${{ matrix.target }} -- -D warnings
 
+    - name: Provision Windows software OpenGL
+      if: runner.os == 'Windows'
+      run: ./scripts/windows-mesa.ps1 -Target ${{ matrix.target }} -Profile debug
+
     - name: Windows executable smoke tests
       if: runner.os == 'Windows'
       run: python scripts/windows-smoke.py --target ${{ matrix.target }} --profile debug
