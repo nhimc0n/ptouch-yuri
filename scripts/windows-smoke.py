@@ -7,6 +7,7 @@ import json
 from pathlib import Path
 import struct
 import subprocess
+import sys
 
 
 def check_pe(path, machine, require_icon=False):
@@ -56,7 +57,10 @@ if __name__ == "__main__":
         raise RuntimeError("Invalid read-only doctor report")
     if report["process_arch"] != ("aarch64" if args.target.startswith("aarch64") else "x86_64"):
         raise RuntimeError("Doctor architecture disagrees with the build target")
-    result = subprocess.run([str(gui), "--smoke-test"], check=True, timeout=60, capture_output=True, text=True)
+    result = subprocess.run([str(gui), "--smoke-test"], timeout=60, capture_output=True, text=True)
+    print(result.stdout, end="")
+    print(result.stderr, end="", file=sys.stderr)
+    result.check_returncode()
     if "PTOUCH_GUI_SMOKE_OK" not in result.stdout:
         raise RuntimeError(f"GUI did not complete its rendering check: {result.stdout}\n{result.stderr}")
     print("PE architecture, icon, CLI startup, and GUI rendering passed")
