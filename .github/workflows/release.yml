@@ -135,15 +135,7 @@ jobs:
           PACKAGE_ARCH: ${{ matrix.package_arch }}
           RUST_TARGET: ${{ matrix.target }}
           RPM_ARCH: ${{ matrix.rpm_arch }}
-        run: |
-          export VERSION="${GITHUB_REF_NAME#v}"
-          go install github.com/goreleaser/nfpm/v2/cmd/nfpm@v2.47.0
-          nfpm="$(go env GOPATH)/bin/nfpm"
-          mkdir -p dist
-          "$nfpm" package -f packaging/nfpm.yaml -p deb -t "dist/ptouch_${VERSION}_${PACKAGE_ARCH}.deb"
-          "$nfpm" package -f packaging/nfpm.yaml -p rpm -t "dist/ptouch-${VERSION}.${RPM_ARCH}.rpm"
-          test "$(dpkg-deb --field dist/*.deb Architecture)" = "$PACKAGE_ARCH"
-          test "$(rpm -qp --queryformat '%{ARCH}' dist/*.rpm)" = "$RPM_ARCH"
+        run: bash scripts/package-linux.sh
 
       - name: Upload Linux packages
         if: runner.os == 'Linux'

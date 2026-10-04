@@ -18,9 +18,9 @@ homepage: https://github.com/vowstar/ptouch-rs
 license: GPL-3.0-or-later
 
 contents:
-  - src: ./target/${RUST_TARGET}/release/ptouch
+  - src: ./target/${RUST_TARGET}/${BUILD_PROFILE}/ptouch
     dst: /usr/bin/ptouch
-  - src: ./target/${RUST_TARGET}/release/ptouch-gui
+  - src: ./target/${RUST_TARGET}/${BUILD_PROFILE}/ptouch-gui
     dst: /usr/bin/ptouch-gui
   - src: ./data/io.github.vowstar.ptouch-gui.desktop
     dst: /usr/share/applications/io.github.vowstar.ptouch-gui.desktop
