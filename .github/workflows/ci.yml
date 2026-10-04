@@ -65,6 +65,9 @@ jobs:
           target
         key: ${{ runner.os }}-${{ matrix.target }}-cargo-${{ hashFiles('**/Cargo.lock') }}
 
+    - name: Check platform core and examples
+      run: cargo clippy -p ptouch-core --all-targets --all-features --locked --target ${{ matrix.target }} -- -D warnings
+
     - name: Build
       run: cargo build --workspace --locked --verbose --target ${{ matrix.target }}
 
