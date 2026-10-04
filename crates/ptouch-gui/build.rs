@@ -15,10 +15,6 @@ fn main() {
         println!("cargo:rerun-if-changed={icon}");
         let mut res = winresource::WindowsResource::new();
         res.set_icon(icon);
-        if let Err(e) = res.compile() {
-            // Non-fatal: a missing resource compiler should not break the build,
-            // only leave the executable without its icon.
-            println!("cargo:warning=failed to embed Windows icon: {e}");
-        }
+        res.compile().expect("failed to embed Windows icon");
     }
 }

@@ -33,6 +33,7 @@ fn main() -> eframe::Result<()> {
         std::process::exit(exit_code);
     }
     env_logger::init();
+    let smoke_test = std::env::args().nth(1).as_deref() == Some("--smoke-test");
 
     // `with_app_id` sets the Wayland app_id / X11 WM_CLASS so the desktop entry
     // (StartupWMClass) associates its icon with the window.
@@ -52,6 +53,6 @@ fn main() -> eframe::Result<()> {
     eframe::run_native(
         "P-Touch Label Printer",
         options,
-        Box::new(|cc| Ok(Box::new(app::PtouchApp::new(cc)))),
+        Box::new(move |cc| Ok(Box::new(app::PtouchApp::new(cc, smoke_test)))),
     )
 }

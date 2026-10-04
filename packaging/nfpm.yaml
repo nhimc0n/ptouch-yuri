@@ -4,7 +4,7 @@
 # libusb is compiled in statically (rusb "vendored"), so there is no libusb
 # runtime dependency; the vendored libusb still links libudev dynamically.
 name: ptouch
-arch: amd64
+arch: ${PACKAGE_ARCH}
 platform: linux
 version: ${VERSION}
 section: utils
@@ -18,9 +18,9 @@ homepage: https://github.com/vowstar/ptouch-rs
 license: GPL-3.0-or-later
 
 contents:
-  - src: ./target/x86_64-unknown-linux-gnu/release/ptouch
+  - src: ./target/${RUST_TARGET}/release/ptouch
     dst: /usr/bin/ptouch
-  - src: ./target/x86_64-unknown-linux-gnu/release/ptouch-gui
+  - src: ./target/${RUST_TARGET}/release/ptouch-gui
     dst: /usr/bin/ptouch-gui
   - src: ./data/io.github.vowstar.ptouch-gui.desktop
     dst: /usr/share/applications/io.github.vowstar.ptouch-gui.desktop

@@ -41,7 +41,10 @@ sudo emerge dev-libs/libusb                      # Gentoo
 cargo build --release --workspace
 ```
 
-**macOS / Windows**: no extra dependencies.
+**macOS**: install the Xcode command-line tools.
+
+**Windows**: install the MSVC C++ build tools and Windows SDK. ARM64 builds
+require the ARM64 C++ tools. No separate libusb installation is needed.
 
 ```sh
 cargo build --release --workspace
@@ -103,17 +106,38 @@ connection, which is then closed.
 
 ## Prebuilt Packages
 
-Each release publishes ready-to-use downloads on the
+The release workflow publishes downloads on the
 [releases page](https://github.com/vowstar/ptouch-rs/releases):
 
-- **Linux**: `.deb` and `.rpm` that install the CLI, the GUI, the desktop entry,
+- **Linux amd64 / arm64**: `.deb` and `.rpm` that install the CLI, the GUI, the desktop entry,
   the icon, and the udev rule (the post-install step reloads udev), plus the raw
   binaries.
 - **macOS**: `ptouch-gui-macos-arm64.app.zip` (a `.app` bundle with the icon)
   and the raw `ptouch` CLI binary. The app is unsigned, so on first launch
   right-click the app and choose Open, or run
   `xattr -dr com.apple.quarantine ptouch-gui.app`.
-- **Windows**: `ptouch.exe` and `ptouch-gui.exe` (the icon is embedded).
+- **Windows amd64 / arm64**: `ptouch-windows-{arch}.exe` and
+  `ptouch-gui-windows-{arch}.exe` (the icon is embedded).
+- **Integrity**: `SHA256SUMS` covers every binary and package.
+
+Windows and Linux ARM64 assets are added after v0.8.3. macOS ARM64 assets
+already exist in v0.8.3. Check the selected release's asset list.
+
+| Platform | Rust target | Native CI runner | Hardware validation |
+| --- | --- | --- | --- |
+| Linux x64 | `x86_64-unknown-linux-gnu` | `ubuntu-latest` | Separate from CI |
+| Linux ARM64 | `aarch64-unknown-linux-gnu` | `ubuntu-24.04-arm` | PT-P710BT acceptance pending |
+| Windows x64 | `x86_64-pc-windows-msvc` | `windows-latest` | Separate from CI |
+| Windows ARM64 | `aarch64-pc-windows-msvc` | `windows-11-arm` | PT-P710BT acceptance pending |
+| macOS ARM64 | `aarch64-apple-darwin` | `macos-latest` | PT-P300BT Bluetooth verified; USB tested separately |
+
+CI builds and tests each target natively, validates binary architecture, and
+runs CLI startup and GUI rendering checks. These checks do not exercise a printer.
+The Linux ARM64 packages use Debian `arm64` and RPM `aarch64` metadata.
+Nix checks cover both Linux architectures.
+
+`ptouch-gui --smoke-test` renders three frames and exits without starting the
+printer worker. This mode requires a working display and OpenGL context.
 
 ## GUI
 
@@ -268,8 +292,8 @@ committed rasters still match the SVG.
 
 ## USB Driver (Windows)
 
-Communication goes through libusb, which on Windows can only reach a device
-that uses the WinUSB driver. Out of the box Windows binds the printer to its
+Communication goes through libusb. WinUSB is the recommended Windows driver
+for this project. Other libusb backends have separate driver and DLL requirements. Out of the box Windows binds the printer to its
 own driver (and the official Brother driver does the same), so `ptouch info`
 reports `Device not found` until you switch it. See issue
 [#4](https://github.com/vowstar/ptouch-rs/issues/4).
@@ -282,6 +306,32 @@ reports `Device not found` until you switch it. See issue
 
 After this the normal Brother software no longer sees the printer. Undo it any
 time by uninstalling or rolling back the driver in Device Manager.
+
+### Windows ARM64 installation failures
+
+An ARM64 executable does not change the printer's driver binding. Windows 11
+can emulate x64 applications, but kernel drivers need native ARM64 support.
+PT-P710BT (`04F9:20AF`) is already in the model table. A device bound to
+`usbprint` is not accessible through this project's existing libusb transport.
+
+Zadig 2.8 added ARM64 WinUSB installation support. Installation can still fail
+because Windows rejects a generated driver package's signature. See
+[libwdi #289](https://github.com/pbatard/libwdi/issues/289). The generic error
+alone does not establish that this is the cause on a particular machine.
+
+For an installation failure, collect the complete Zadig log, Windows build,
+device hardware IDs, and the matching section of `%SystemRoot%\inf\setupapi.dev.log`.
+Remove unrelated device identifiers before sharing logs.
+
+Selecting the system `winusb.inf` file alone does not supply a device-specific
+binding. Microsoft's [WinUSB installation guide](https://learn.microsoft.com/en-us/windows-hardware/drivers/usbcon/winusb-installation)
+describes device matching, interface GUID registration, and signed catalog files.
+A custom INF requires a valid signed package. Disabling signature enforcement
+is not part of the project's installation procedure.
+
+ARM64 acceptance requires status reads, single and chained labels, cutting,
+long labels, device removal, and reconnect tests on the actual printer.
+Keep driver-binding failures separate from application startup failures.
 
 ## USB Driver (macOS)
 

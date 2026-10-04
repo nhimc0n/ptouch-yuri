@@ -8,11 +8,16 @@ on:
 env:
   CARGO_TERM_COLOR: always
 
+permissions:
+  contents: read
+
 jobs:
   build:
-    name: Build Release
+    name: Build Release (${{ matrix.target }})
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
     strategy:
+      fail-fast: false
       matrix:
         include:
           - os: ubuntu-latest
@@ -20,11 +25,25 @@ jobs:
             artifact_gui: ptouch-gui
             asset_suffix: linux-amd64
             target: x86_64-unknown-linux-gnu
+            package_arch: amd64
+            rpm_arch: x86_64
+          - os: ubuntu-24.04-arm
+            artifact_cli: ptouch
+            artifact_gui: ptouch-gui
+            asset_suffix: linux-arm64
+            target: aarch64-unknown-linux-gnu
+            package_arch: arm64
+            rpm_arch: aarch64
           - os: windows-latest
             artifact_cli: ptouch.exe
             artifact_gui: ptouch-gui.exe
             asset_suffix: windows-amd64
             target: x86_64-pc-windows-msvc
+          - os: windows-11-arm
+            artifact_cli: ptouch.exe
+            artifact_gui: ptouch-gui.exe
+            asset_suffix: windows-arm64
+            target: aarch64-pc-windows-msvc
           - os: macos-latest
             artifact_cli: ptouch
             artifact_gui: ptouch-gui
@@ -32,10 +51,10 @@ jobs:
             target: aarch64-apple-darwin
 
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       - name: Setup Rust
-        uses: dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@89b12181fb390509a0842a86cc55eeb8eb928c1d # stable
         with:
           targets: ${{ matrix.target }}
 
@@ -45,20 +64,42 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y libusb-1.0-0-dev libudev-dev \
           libxcb-render0-dev libxcb-shape0-dev libxcb-xfixes0-dev \
-          libxkbcommon-dev libssl-dev
+          libxkbcommon-dev libssl-dev xvfb libgl1-mesa-dri fonts-dejavu-core rpm
 
       - name: Build
-        run: cargo build --release --workspace --verbose --target ${{ matrix.target }}
+        run: cargo build --release --workspace --locked --verbose --target ${{ matrix.target }}
+
+      - name: Test release candidate
+        run: cargo test --workspace --all-features --locked --target ${{ matrix.target }}
+
+      - name: Check tag version
+        shell: bash
+        run: python scripts/release-assets.py --check-version "$GITHUB_REF_NAME"
+
+      - name: Windows executable smoke tests
+        if: runner.os == 'Windows'
+        run: python scripts/windows-smoke.py --target ${{ matrix.target }} --profile release
+
+      - name: Native Unix executable smoke tests
+        if: runner.os != 'Windows'
+        env:
+          LIBGL_ALWAYS_SOFTWARE: "1"
+        run: |
+          if [ "$RUNNER_OS" = Linux ]; then
+            xvfb-run -a python3 scripts/unix-smoke.py --target ${{ matrix.target }} --profile release
+          else
+            python3 scripts/unix-smoke.py --target ${{ matrix.target }} --profile release
+          fi
 
       - name: Upload CLI artifact
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: ptouch-${{ matrix.asset_suffix }}
           path: target/${{ matrix.target }}/release/${{ matrix.artifact_cli }}
           if-no-files-found: error
 
       - name: Upload GUI artifact
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: ptouch-gui-${{ matrix.asset_suffix }}
           path: target/${{ matrix.target }}/release/${{ matrix.artifact_gui }}
@@ -80,7 +121,7 @@ jobs:
 
       - name: Upload macOS .app bundle
         if: runner.os == 'macOS'
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: ptouch-gui-${{ matrix.asset_suffix }}-app
           path: ptouch-gui-${{ matrix.asset_suffix }}.app.zip
@@ -90,20 +131,25 @@ jobs:
       # desktop entry, the icon, and the udev rule (postinst reloads udev).
       - name: Package .deb and .rpm
         if: runner.os == 'Linux'
+        env:
+          PACKAGE_ARCH: ${{ matrix.package_arch }}
+          RUST_TARGET: ${{ matrix.target }}
+          RPM_ARCH: ${{ matrix.rpm_arch }}
         run: |
           export VERSION="${GITHUB_REF_NAME#v}"
           go install github.com/goreleaser/nfpm/v2/cmd/nfpm@v2.47.0
           nfpm="$(go env GOPATH)/bin/nfpm"
           mkdir -p dist
-          "$nfpm" package -f packaging/nfpm.yaml -p deb -t "dist/ptouch_${VERSION}_amd64.deb"
-          "$nfpm" package -f packaging/nfpm.yaml -p rpm -t "dist/ptouch-${VERSION}.x86_64.rpm"
-          ls -l dist
+          "$nfpm" package -f packaging/nfpm.yaml -p deb -t "dist/ptouch_${VERSION}_${PACKAGE_ARCH}.deb"
+          "$nfpm" package -f packaging/nfpm.yaml -p rpm -t "dist/ptouch-${VERSION}.${RPM_ARCH}.rpm"
+          test "$(dpkg-deb --field dist/*.deb Architecture)" = "$PACKAGE_ARCH"
+          test "$(rpm -qp --queryformat '%{ARCH}' dist/*.rpm)" = "$RPM_ARCH"
 
       - name: Upload Linux packages
         if: runner.os == 'Linux'
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
-          name: ptouch-linux-packages
+          name: ptouch-${{ matrix.asset_suffix }}-packages
           path: dist/*
           if-no-files-found: error
 
@@ -114,28 +160,19 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       - name: Download all artifacts
-        uses: actions/download-artifact@v8
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
         with:
           path: artifacts
 
-      - name: Prepare release assets
-        run: |
-          mkdir -p release
-          cp artifacts/ptouch-linux-amd64/ptouch release/ptouch-linux-amd64
-          cp artifacts/ptouch-gui-linux-amd64/ptouch-gui release/ptouch-gui-linux-amd64
-          cp artifacts/ptouch-windows-amd64/ptouch.exe release/ptouch-windows-amd64.exe
-          cp artifacts/ptouch-gui-windows-amd64/ptouch-gui.exe release/ptouch-gui-windows-amd64.exe
-          cp artifacts/ptouch-macos-arm64/ptouch release/ptouch-macos-arm64
-          cp artifacts/ptouch-gui-macos-arm64/ptouch-gui release/ptouch-gui-macos-arm64
-          cp artifacts/ptouch-gui-macos-arm64-app/*.app.zip release/
-          cp artifacts/ptouch-linux-packages/*.deb release/
-          cp artifacts/ptouch-linux-packages/*.rpm release/
+      - name: Prepare and verify release assets
+        run: python3 scripts/release-assets.py --artifacts artifacts --output release
 
       - name: Create Release
-        uses: softprops/action-gh-release@v3
+        uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3
         with:
           files: release/*
           generate_release_notes: true
+          fail_on_unmatched_files: true

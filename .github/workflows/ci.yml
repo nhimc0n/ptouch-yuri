@@ -9,27 +9,37 @@ on:
 env:
   CARGO_TERM_COLOR: always
 
+permissions:
+  contents: read
+
 jobs:
   build:
-    name: Build and Test
+    name: Build and Test (${{ matrix.target }})
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
     strategy:
+      fail-fast: false
       matrix:
         include:
           - os: ubuntu-latest
             target: x86_64-unknown-linux-gnu
+          - os: ubuntu-24.04-arm
+            target: aarch64-unknown-linux-gnu
           - os: windows-latest
             target: x86_64-pc-windows-msvc
+          - os: windows-11-arm
+            target: aarch64-pc-windows-msvc
           - os: macos-latest
             target: aarch64-apple-darwin
 
     steps:
-    - uses: actions/checkout@v7
+    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
     - name: Setup Rust
-      uses: dtolnay/rust-toolchain@stable
+      uses: dtolnay/rust-toolchain@89b12181fb390509a0842a86cc55eeb8eb928c1d # stable
       with:
         targets: ${{ matrix.target }}
+        components: clippy
 
     - name: Install system dependencies (Linux)
       if: runner.os == 'Linux'
@@ -37,10 +47,10 @@ jobs:
         sudo apt-get update
         sudo apt-get install -y libusb-1.0-0-dev libudev-dev \
           libxcb-render0-dev libxcb-shape0-dev libxcb-xfixes0-dev \
-          libxkbcommon-dev libssl-dev
+          libxkbcommon-dev libssl-dev xvfb libgl1-mesa-dri fonts-dejavu-core
 
     - name: Cache dependencies
-      uses: actions/cache@v6
+      uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
       with:
         path: |
           ~/.cargo/registry
@@ -49,12 +59,35 @@ jobs:
         key: ${{ runner.os }}-${{ matrix.target }}-cargo-${{ hashFiles('**/Cargo.lock') }}
 
     - name: Build
-      run: cargo build --workspace --verbose --target ${{ matrix.target }}
+      run: cargo build --workspace --locked --verbose --target ${{ matrix.target }}
 
     - name: Run tests
-      run: cargo test --workspace --verbose --target ${{ matrix.target }}
+      run: cargo test --workspace --locked --verbose --target ${{ matrix.target }}
 
     - name: Test optional Bluetooth feature
       run: |
         cargo test -p ptouch-core --features bluetooth --all-targets --locked --target ${{ matrix.target }}
         cargo test -p ptouch-core --features bluetooth --doc --locked --target ${{ matrix.target }}
+
+    - name: Windows lint
+      if: runner.os == 'Windows'
+      run: cargo clippy --workspace --all-targets --all-features --locked --target ${{ matrix.target }} -- -D warnings
+
+    - name: Windows executable smoke tests
+      if: runner.os == 'Windows'
+      run: python scripts/windows-smoke.py --target ${{ matrix.target }} --profile debug
+
+    - name: Check packaging scripts
+      if: runner.os == 'Linux'
+      run: python3 -m unittest discover -s scripts -p 'test_*.py'
+
+    - name: Native Unix executable smoke tests
+      if: runner.os != 'Windows'
+      env:
+        LIBGL_ALWAYS_SOFTWARE: "1"
+      run: |
+        if [ "$RUNNER_OS" = Linux ]; then
+          xvfb-run -a python3 scripts/unix-smoke.py --target ${{ matrix.target }} --profile debug
+        else
+          python3 scripts/unix-smoke.py --target ${{ matrix.target }} --profile debug
+        fi

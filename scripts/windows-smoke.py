@@ -1,0 +1,56 @@
+#!/usr/bin/env python3
+# SPDX-License-Identifier: MIT
+"""Check Windows executable architecture, embedded icons, and native startup."""
+
+import argparse
+from pathlib import Path
+import struct
+import subprocess
+
+
+def check_pe(path, machine, require_icon=False):
+    data = path.read_bytes()
+    if data[:2] != b"MZ":
+        raise ValueError(f"{path}: not a PE executable")
+    pe = struct.unpack_from("<I", data, 0x3C)[0]
+    if data[pe:pe + 4] != b"PE\0\0":
+        raise ValueError(f"{path}: invalid PE signature")
+    actual, sections = struct.unpack_from("<HH", data, pe + 4)
+    if actual != machine:
+        raise ValueError(f"{path}: machine {actual:#x}, expected {machine:#x}")
+    if not require_icon:
+        return
+    optional = pe + 24
+    if struct.unpack_from("<H", data, optional)[0] != 0x20B:
+        raise ValueError(f"{path}: expected PE32+")
+    resource_rva = struct.unpack_from("<I", data, optional + 112 + 2 * 8)[0]
+    optional_size = struct.unpack_from("<H", data, pe + 20)[0]
+    for index in range(sections):
+        section = optional + optional_size + index * 40
+        size, rva, raw_size, offset = struct.unpack_from("<IIII", data, section + 8)
+        if rva <= resource_rva < rva + max(size, raw_size):
+            root = offset + resource_rva - rva
+            named, ids = struct.unpack_from("<HH", data, root + 12)
+            for entry in range(named + ids):
+                kind = struct.unpack_from("<I", data, root + 16 + entry * 8)[0]
+                if kind == 14:  # RT_GROUP_ICON
+                    return
+    raise ValueError(f"{path}: no embedded group icon")
+
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--target", required=True, choices=("x86_64-pc-windows-msvc", "aarch64-pc-windows-msvc"))
+    parser.add_argument("--profile", required=True, choices=("debug", "release"))
+    args = parser.parse_args()
+    directory = Path("target") / args.target / args.profile
+    machine = 0xAA64 if args.target.startswith("aarch64") else 0x8664
+    cli, gui = directory / "ptouch.exe", directory / "ptouch-gui.exe"
+    check_pe(cli, machine)
+    check_pe(gui, machine, require_icon=True)
+    for option in ("--version", "--help"):
+        subprocess.run([str(cli), option], check=True, timeout=30)
+    result = subprocess.run([str(gui), "--smoke-test"], check=True, timeout=60, capture_output=True, text=True)
+    if "PTOUCH_GUI_SMOKE_OK" not in result.stdout:
+        raise RuntimeError(f"GUI did not complete its rendering check: {result.stdout}\n{result.stderr}")
+    print("PE architecture, icon, CLI startup, and GUI rendering passed")
