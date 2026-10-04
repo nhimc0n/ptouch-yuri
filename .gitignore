@@ -23,3 +23,6 @@ target
 .cursor
 .tasks
 .vscode
+
+# Python packaging checks
+__pycache__/

@@ -21,32 +21,36 @@ pub struct PtouchApp {
     renderer: TextRenderer,
     /// Receiver for responses from the printer worker thread.
     resp_rx: mpsc::Receiver<PrinterEvent>,
+    smoke_frames: Option<u8>,
 }
 
 impl PtouchApp {
     /// Create a new application instance.
-    pub fn new(cc: &eframe::CreationContext<'_>) -> Self {
+    pub fn new(cc: &eframe::CreationContext<'_>, smoke_test: bool) -> Self {
         setup_fallback_fonts(&cc.egui_ctx);
 
         let (cmd_tx, cmd_rx) = mpsc::channel();
         let (resp_tx, resp_rx) = mpsc::channel();
 
-        let ctx = cc.egui_ctx.clone();
-        std::thread::Builder::new()
-            .name("printer-worker".to_string())
-            .spawn(move || {
-                printer_worker::printer_worker(cmd_rx, resp_tx, ctx);
-            })
-            .expect("failed to spawn printer worker thread");
+        if !smoke_test {
+            let ctx = cc.egui_ctx.clone();
+            std::thread::Builder::new()
+                .name("printer-worker".to_string())
+                .spawn(move || {
+                    printer_worker::printer_worker(cmd_rx, resp_tx, ctx);
+                })
+                .expect("failed to spawn printer worker thread");
+        }
 
         Self {
             state: AppState {
                 available_fonts: ptouch_render::font::list_fonts(),
-                printer_cmd_tx: Some(cmd_tx),
+                printer_cmd_tx: (!smoke_test).then_some(cmd_tx),
                 ..AppState::default()
             },
             renderer: TextRenderer::new(),
             resp_rx,
+            smoke_frames: smoke_test.then_some(0),
         }
     }
 
@@ -227,6 +231,17 @@ impl eframe::App for PtouchApp {
             self.update_preview(&ctx);
         }
 
+        // Exit only after multiple frames exercised the actual window renderer.
+        if let Some(frames) = &mut self.smoke_frames {
+            *frames += 1;
+            if *frames >= 3 {
+                println!("PTOUCH_GUI_SMOKE_OK");
+                ctx.send_viewport_cmd(egui::ViewportCommand::Close);
+                self.smoke_frames = None;
+            }
+            ctx.request_repaint();
+        }
+
         // Periodic repaint so we pick up worker responses even when idle
         ctx.request_repaint_after(std::time::Duration::from_secs(1));
     }
@@ -274,6 +289,7 @@ mod tests {
                 state,
                 renderer: TextRenderer::new(),
                 resp_rx: rx,
+                smoke_frames: None,
             },
             tx,
         )

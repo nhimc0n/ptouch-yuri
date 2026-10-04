@@ -479,16 +479,16 @@ mod tests {
         for y in 0..100 {
             for x in 0..200 {
                 let val = if y < 50 {
-                    20 + (x as u32 * 60 / 199) as u8 // 20..80
+                    20 + (x * 60 / 199) as u8 // 20..80
                 } else {
-                    180 + (x as u32 * 60 / 199) as u8 // 180..240
+                    180 + (x * 60 / 199) as u8 // 180..240
                 };
                 img.put_pixel(x, y, Luma([val]));
             }
         }
         let thresh = otsu_threshold(&img);
         assert!(
-            thresh >= 80 && thresh <= 180,
+            (80..=180).contains(&thresh),
             "Expected threshold between 80 and 180, got {}",
             thresh
         );
@@ -501,9 +501,9 @@ mod tests {
         for y in 0..100 {
             for x in 0..100 {
                 let val = if y < 10 {
-                    10 + (x as u32 * 40 / 99) as u8 // 10..50
+                    10 + (x * 40 / 99) as u8 // 10..50
                 } else {
-                    190 + (x as u32 * 40 / 99) as u8 // 190..230
+                    190 + (x * 40 / 99) as u8 // 190..230
                 };
                 img.put_pixel(x, y, Luma([val]));
             }
@@ -511,7 +511,7 @@ mod tests {
         let thresh = otsu_threshold(&img);
         // Threshold should split between the dark and bright groups.
         assert!(
-            thresh >= 50 && thresh <= 190,
+            (50..=190).contains(&thresh),
             "Expected threshold between 50 and 190, got {}",
             thresh
         );
