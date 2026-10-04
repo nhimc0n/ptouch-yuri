@@ -6,6 +6,7 @@ import argparse
 from pathlib import Path
 import struct
 import subprocess
+import sys
 
 
 def check_architecture(path, target):
@@ -28,7 +29,10 @@ if __name__ == "__main__":
         check_architecture(directory / name, args.target)
     for option in ("--version", "--help"):
         subprocess.run([str(directory / "ptouch"), option], check=True, timeout=30)
-    result = subprocess.run([str(directory / "ptouch-gui"), "--smoke-test"], check=True, timeout=60, capture_output=True, text=True)
+    result = subprocess.run([str(directory / "ptouch-gui"), "--smoke-test"], timeout=60, capture_output=True, text=True)
+    print(result.stdout, end="")
+    print(result.stderr, end="", file=sys.stderr)
+    result.check_returncode()
     if "PTOUCH_GUI_SMOKE_OK" not in result.stdout:
         raise RuntimeError(f"GUI rendering check failed: {result.stdout}\n{result.stderr}")
     print("Binary architecture, CLI startup, and GUI rendering passed")
