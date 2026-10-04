@@ -78,6 +78,10 @@ jobs:
         shell: bash
         run: python scripts/release-assets.py --check-version "$GITHUB_REF_NAME"
 
+      - name: Provision Windows software OpenGL
+        if: runner.os == 'Windows'
+        run: ./scripts/windows-mesa.ps1 -Target ${{ matrix.target }} -Profile release
+
       - name: Windows executable smoke tests
         if: runner.os == 'Windows'
         run: python scripts/windows-smoke.py --target ${{ matrix.target }} --profile release
