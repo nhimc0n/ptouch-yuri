@@ -20,8 +20,10 @@ license: GPL-3.0-or-later
 contents:
   - src: ./target/${RUST_TARGET}/${BUILD_PROFILE}/ptouch
     dst: /usr/bin/ptouch
+    expand: true
   - src: ./target/${RUST_TARGET}/${BUILD_PROFILE}/ptouch-gui
     dst: /usr/bin/ptouch-gui
+    expand: true
   - src: ./data/io.github.vowstar.ptouch-gui.desktop
     dst: /usr/share/applications/io.github.vowstar.ptouch-gui.desktop
   - src: ./data/io.github.vowstar.ptouch-gui.svg
