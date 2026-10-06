@@ -137,7 +137,9 @@ Code: `ptouch-core/src/network.rs` (`NetworkPrinter`), CLI `--host`.
 declares LANDSCAPE label pages (length x 36 mm tape), 360 dpi, cut mode (half / full), imageable area =
 the 454-dot band (macOS then emits exactly the band). macOS (`cgpdftoraster`) renders the PDF, the filter
 builds the job, CUPS' built-in `lpd` backend delivers it to `lpd://<ip>/BINARY_P1`. One label per job
-(pages > 1 or copies > 1 are refused). Dry run without a printer:
+(pages > 1 or copies > 1 are refused). Page size `Auto` (default, 400 mm page) trims blank
+lines at both ends (2 mm kept) so the label is as long as its content; fixed sizes and `Custom` (15-1000 mm
+long x 36 mm) print the page length exactly. The printer adds ~1 mm feed margin per end (a 50 mm page prints 52 mm). Dry run without a printer:
 `cupsfilter -p data/cups/PT-E850TKW.ppd -m application/vnd.cups-raster in.pdf > in.ras` then
 `rastertoptouch --dry-run in.ras out.bin`. Install/reinstall with `scripts/install-cups-macos.sh <ip>` (sudo).
 
