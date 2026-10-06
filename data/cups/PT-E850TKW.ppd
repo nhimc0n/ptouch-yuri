@@ -1,0 +1,92 @@
+*PPD-Adobe: "4.3"
+*FormatVersion: "4.3"
+*FileVersion: "0.1"
+*LanguageVersion: English
+*LanguageEncoding: ISOLatin1
+*PCFileName: "PTE850.PPD"
+*Manufacturer: "Brother"
+*ModelName: "PT-E850TKW"
+*Product: "(PT-E850TKW)"
+*PSVersion: "(3010.000) 0"
+*NickName: "Brother PT-E850TKW (TZe 36mm)"
+*ShortNickName: "Brother PT-E850TKW"
+*1284DeviceID: "MFG:Brother;CMD:PJL;MDL:PT-E850TKW;CLS:PRINTER;"
+*cupsVersion: 2.4
+*cupsModelNumber: 0
+*cupsFilter: "application/vnd.cups-raster 0 /Library/Printers/PTouchE850/rastertoptouch"
+*ColorDevice: False
+*DefaultColorSpace: Gray
+*TTRasterizer: Type42
+*FileSystem: False
+*Throughput: "1"
+*LandscapeOrientation: Plus90
+
+*% Label pages are LANDSCAPE: width = label length (feed), height = tape width.
+*% The top and bottom 2 mm (28 dots) of the 36 mm tape cannot be printed (band is 454 dots).
+*% Only TZe 36 mm is verified on the PT-E850TKW; other tape widths are added once verified.
+*OpenUI *PageSize/Label Size: PickOne
+*OrderDependency: 10 AnySetup *PageSize
+*DefaultPageSize: L100
+*PageSize L50/50 mm x 36 mm: "<</PageSize[141.73 102.05]/ImagingBBox null>>setpagedevice"
+*PageSize L75/75 mm x 36 mm: "<</PageSize[212.60 102.05]/ImagingBBox null>>setpagedevice"
+*PageSize L100/100 mm x 36 mm: "<</PageSize[283.46 102.05]/ImagingBBox null>>setpagedevice"
+*PageSize L150/150 mm x 36 mm: "<</PageSize[425.20 102.05]/ImagingBBox null>>setpagedevice"
+*PageSize L200/200 mm x 36 mm: "<</PageSize[566.93 102.05]/ImagingBBox null>>setpagedevice"
+*PageSize L300/300 mm x 36 mm: "<</PageSize[850.39 102.05]/ImagingBBox null>>setpagedevice"
+*CloseUI: *PageSize
+
+*OpenUI *PageRegion/Label Size: PickOne
+*OrderDependency: 10 AnySetup *PageRegion
+*DefaultPageRegion: L100
+*PageRegion L50/50 mm x 36 mm: "<</PageSize[141.73 102.05]/ImagingBBox null>>setpagedevice"
+*PageRegion L75/75 mm x 36 mm: "<</PageSize[212.60 102.05]/ImagingBBox null>>setpagedevice"
+*PageRegion L100/100 mm x 36 mm: "<</PageSize[283.46 102.05]/ImagingBBox null>>setpagedevice"
+*PageRegion L150/150 mm x 36 mm: "<</PageSize[425.20 102.05]/ImagingBBox null>>setpagedevice"
+*PageRegion L200/200 mm x 36 mm: "<</PageSize[566.93 102.05]/ImagingBBox null>>setpagedevice"
+*PageRegion L300/300 mm x 36 mm: "<</PageSize[850.39 102.05]/ImagingBBox null>>setpagedevice"
+*CloseUI: *PageRegion
+
+*DefaultImageableArea: L100
+*ImageableArea L50/50 mm x 36 mm: "0 5.60 141.73 96.45"
+*ImageableArea L75/75 mm x 36 mm: "0 5.60 212.60 96.45"
+*ImageableArea L100/100 mm x 36 mm: "0 5.60 283.46 96.45"
+*ImageableArea L150/150 mm x 36 mm: "0 5.60 425.20 96.45"
+*ImageableArea L200/200 mm x 36 mm: "0 5.60 566.93 96.45"
+*ImageableArea L300/300 mm x 36 mm: "0 5.60 850.39 96.45"
+*DefaultPaperDimension: L100
+*PaperDimension L50/50 mm x 36 mm: "141.73 102.05"
+*PaperDimension L75/75 mm x 36 mm: "212.60 102.05"
+*PaperDimension L100/100 mm x 36 mm: "283.46 102.05"
+*PaperDimension L150/150 mm x 36 mm: "425.20 102.05"
+*PaperDimension L200/200 mm x 36 mm: "566.93 102.05"
+*PaperDimension L300/300 mm x 36 mm: "850.39 102.05"
+
+*MaxMediaWidth: "2834.65"
+*MaxMediaHeight: "102.05"
+*HWMargins: 0 5.60 0 5.60
+*CustomPageSize True: "pop pop pop <</PageSize[5 -2 roll]/ImagingBBox null>>setpagedevice"
+*ParamCustomPageSize Width: 1 points 42.52 2834.65
+*ParamCustomPageSize Height: 2 points 102.05 102.05
+*ParamCustomPageSize WidthOffset: 3 points 0 0
+*ParamCustomPageSize HeightOffset: 4 points 0 0
+*ParamCustomPageSize Orientation: 5 int 0 0
+
+*OpenUI *Resolution/Resolution: PickOne
+*OrderDependency: 20 AnySetup *Resolution
+*DefaultResolution: 360dpi
+*Resolution 360dpi/Standard 360 x 360 dpi: "<</HWResolution[360 360]>>setpagedevice"
+*CloseUI: *Resolution
+
+*OpenUI *ColorModel/Color Mode: PickOne
+*OrderDependency: 10 AnySetup *ColorModel
+*DefaultColorModel: Gray
+*ColorModel Gray/Black and white: "<</cupsColorSpace 0/cupsColorOrder 0/cupsBitsPerColor 8>>setpagedevice"
+*CloseUI: *ColorModel
+
+*OpenUI *CutMode/Cut: PickOne
+*OrderDependency: 30 AnySetup *CutMode
+*DefaultCutMode: Half
+*CutMode Half/Half cut (keep the backing): ""
+*CutMode Full/Full cut: ""
+*CloseUI: *CutMode
+
