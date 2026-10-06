@@ -16,8 +16,9 @@ use clap::parser::ValueSource;
 use clap::{ArgMatches, CommandFactory, FromArgMatches, Parser, Subcommand, ValueEnum};
 use log::debug;
 
-#[cfg(target_os = "macos")]
 use ptouch_core::BluetoothDevice;
+#[cfg(target_os = "macos")]
+use ptouch_core::NetworkPrinter;
 use ptouch_core::PrinterStatus;
 use ptouch_core::device::{self, DeviceFlags, DeviceInfo};
 use ptouch_core::error::PtouchError;
@@ -73,6 +74,10 @@ struct PrintArgs {
     /// Select a USB bus/address from `ptouch doctor` (changes on reconnect)
     #[arg(long, value_name = "BUS:ADDRESS", conflicts_with = "bluetooth")]
     usb: Option<UsbLocation>,
+
+    /// Print to a PT-E850TKW over the network (host name or IP address)
+    #[arg(long, value_name = "HOST", conflicts_with_all = ["usb", "bluetooth"])]
+    host: Option<String>,
 
     /// Use an already-paired PT-P300BT at this Bluetooth address (macOS only)
     #[arg(long, value_name = "ADDRESS")]
@@ -187,6 +192,10 @@ struct InfoArgs {
     #[arg(long, value_name = "BUS:ADDRESS", conflicts_with = "bluetooth")]
     usb: Option<UsbLocation>,
 
+    /// Print to a PT-E850TKW over the network (host name or IP address)
+    #[arg(long, value_name = "HOST", conflicts_with_all = ["usb", "bluetooth"])]
+    host: Option<String>,
+
     /// Use an already-paired PT-P300BT at this Bluetooth address (macOS only)
     #[arg(long, value_name = "ADDRESS")]
     bluetooth: Option<String>,
@@ -203,12 +212,20 @@ struct InfoArgs {
 /// The printer selected by the CLI. USB remains the default target.
 enum CliDevice {
     Usb(PtouchDevice),
+    Network(NetworkPrinter),
     #[cfg(target_os = "macos")]
     Bluetooth(BluetoothDevice),
 }
 
 impl CliDevice {
-    fn open(bluetooth: Option<&str>, usb: Option<UsbLocation>) -> Result<Self, PtouchError> {
+    fn open(
+        bluetooth: Option<&str>,
+        usb: Option<UsbLocation>,
+        host: Option<&str>,
+    ) -> Result<Self, PtouchError> {
+        if let Some(host) = host {
+            return NetworkPrinter::open(host).map(Self::Network);
+        }
         if let Some(address) = bluetooth {
             #[cfg(target_os = "macos")]
             {
@@ -229,6 +246,7 @@ impl CliDevice {
     fn init(&mut self) -> Result<(), PtouchError> {
         match self {
             Self::Usb(device) => device.init(),
+            Self::Network(_) => Ok(()),
             #[cfg(target_os = "macos")]
             Self::Bluetooth(device) => device.init(),
         }
@@ -237,6 +255,7 @@ impl CliDevice {
     fn status(&self) -> Option<&PrinterStatus> {
         match self {
             Self::Usb(device) => device.status(),
+            Self::Network(_) => None,
             #[cfg(target_os = "macos")]
             Self::Bluetooth(device) => device.status(),
         }
@@ -245,6 +264,7 @@ impl CliDevice {
     fn model_name(&self) -> &'static str {
         match self {
             Self::Usb(device) => device.device_info().name,
+            Self::Network(device) => device.model_name(),
             #[cfg(target_os = "macos")]
             Self::Bluetooth(device) => device.model_name(),
         }
@@ -253,6 +273,7 @@ impl CliDevice {
     fn tape_width_px(&self) -> Option<u16> {
         match self {
             Self::Usb(device) => device.tape_width_px(),
+            Self::Network(device) => device.tape_width_px(),
             #[cfg(target_os = "macos")]
             Self::Bluetooth(device) => device.tape_width_px(),
         }
@@ -261,14 +282,37 @@ impl CliDevice {
     fn raster_width_px(&self) -> u16 {
         match self {
             Self::Usb(device) => device.max_px(),
+            Self::Network(device) => device.raster_width_px(),
             #[cfg(target_os = "macos")]
             Self::Bluetooth(device) => device.raster_width_px(),
+        }
+    }
+
+    fn set_job_timeout(&mut self, seconds: u64) -> Result<(), PtouchError> {
+        let timeout = std::time::Duration::from_secs(seconds);
+        match self {
+            Self::Usb(device) => device.set_job_timeout(timeout),
+            Self::Network(device) => {
+                device.set_job_timeout(timeout);
+                Ok(())
+            }
+            #[cfg(target_os = "macos")]
+            Self::Bluetooth(_) => Ok(()),
+        }
+    }
+
+    /// Loaded media width in mm, when the connection can tell.
+    fn media_width_mm(&self) -> Option<u8> {
+        match self {
+            Self::Network(device) => Some(device.media_width_mm()),
+            _ => self.status().map(|s| s.media_width),
         }
     }
 
     fn close(self) -> Result<(), PtouchError> {
         match self {
             Self::Usb(device) => device.close(),
+            Self::Network(device) => device.close(),
             #[cfg(target_os = "macos")]
             Self::Bluetooth(device) => device.close(),
         }
@@ -279,6 +323,9 @@ impl CliDevice {
 trait PrintDevice {
     fn dpi(&self) -> u16;
     fn is_bluetooth(&self) -> bool;
+    /// Left pin offset of the printable band, when the model uses per-media
+    /// offsets instead of a centred band.
+    fn band_left_px(&self) -> Option<u16>;
     fn print_raster(
         &mut self,
         lines: &[Vec<u8>],
@@ -289,9 +336,19 @@ trait PrintDevice {
 }
 
 impl PrintDevice for CliDevice {
+    fn band_left_px(&self) -> Option<u16> {
+        match self {
+            Self::Usb(device) => device.band_left_px(),
+            Self::Network(device) => device.band_left_px(),
+            #[cfg(target_os = "macos")]
+            Self::Bluetooth(_) => None,
+        }
+    }
+
     fn dpi(&self) -> u16 {
         match self {
             Self::Usb(device) => device.device_info().dpi,
+            Self::Network(device) => device.dpi(),
             #[cfg(target_os = "macos")]
             Self::Bluetooth(device) => device.dpi(),
         }
@@ -300,6 +357,7 @@ impl PrintDevice for CliDevice {
     fn is_bluetooth(&self) -> bool {
         match self {
             Self::Usb(_) => false,
+            Self::Network(_) => false,
             #[cfg(target_os = "macos")]
             Self::Bluetooth(_) => true,
         }
@@ -314,6 +372,7 @@ impl PrintDevice for CliDevice {
     ) -> Result<(), PtouchError> {
         match self {
             Self::Usb(device) => device.print_raster(lines, chain_print, precut, quality),
+            Self::Network(device) => device.print_raster(lines, chain_print, precut, quality),
             #[cfg(target_os = "macos")]
             Self::Bluetooth(device) => device.print_raster(lines),
         }
@@ -662,8 +721,23 @@ fn execute_gui() {
 
 /// Open the printer and display status and tape information.
 fn execute_info(args: &InfoArgs) -> Result<(), Box<dyn std::error::Error>> {
-    let mut dev = CliDevice::open(args.bluetooth.as_deref(), args.usb)?;
+    let mut dev = CliDevice::open(args.bluetooth.as_deref(), args.usb, args.host.as_deref())?;
     dev.init()?;
+
+    if let CliDevice::Network(net) = &dev {
+        let status = net.status()?;
+        println!("Printer Information");
+        println!("  Model:          {}", net.model_name());
+        println!("  State:          {}", status.describe());
+        println!("  Media width:    {} mm", net.media_width_mm());
+        match (net.tape_width_px(), net.band_left_px()) {
+            (Some(px), Some(left)) => println!("  Printable:      {px} px, starting at pin {left}"),
+            _ => println!("  Printable:      unknown for this media"),
+        }
+        println!("  Raster width:   {} px", net.raster_width_px());
+        println!("  Resolution:     {} DPI", net.dpi());
+        return dev.close().map_err(Into::into);
+    }
 
     // init() already called get_status() internally; use that result.
     let status = dev
@@ -760,28 +834,26 @@ fn execute_print(args: &PrintArgs, ignored: &[String]) -> Result<(), Box<dyn std
     }
 
     // Determine the print width and optionally open the device
-    let (print_width, max_px, mut device): (u32, u16, Option<CliDevice>) =
-        if let Some(w) = args.tape_width {
-            // PNG-only mode, no printer needed
-            debug!("PNG-only mode with forced tape width: {} px", w);
-            (w, w as u16, None)
-        } else {
-            // Connect to the printer
-            debug!("Connecting to printer...");
-            let mut dev = CliDevice::open(args.bluetooth.as_deref(), args.usb)?;
-            #[allow(irrefutable_let_patterns)]
-            if let CliDevice::Usb(usb) = &mut dev {
-                usb.set_job_timeout(std::time::Duration::from_secs(u64::from(args.timeout)))?;
-            }
-            dev.init()?;
-            // init() already called get_status() internally
-            let width = dev.tape_width_px().ok_or_else(|| {
-                PtouchError::StatusError("Could not determine tape width".to_string())
-            })?;
-            let max = dev.raster_width_px();
-            debug!("Printer tape width: {} px, max: {} px", width, max);
-            (u32::from(width), max, Some(dev))
-        };
+    let (print_width, max_px, mut device): (u32, u16, Option<CliDevice>) = if let Some(w) =
+        args.tape_width
+    {
+        // PNG-only mode, no printer needed
+        debug!("PNG-only mode with forced tape width: {} px", w);
+        (w, w as u16, None)
+    } else {
+        // Connect to the printer
+        debug!("Connecting to printer...");
+        let mut dev = CliDevice::open(args.bluetooth.as_deref(), args.usb, args.host.as_deref())?;
+        dev.set_job_timeout(u64::from(args.timeout))?;
+        dev.init()?;
+        // init() already called get_status() internally
+        let width = dev.tape_width_px().ok_or_else(|| {
+            PtouchError::StatusError("Could not determine tape width".to_string())
+        })?;
+        let max = dev.raster_width_px();
+        debug!("Printer tape width: {} px, max: {} px", width, max);
+        (u32::from(width), max, Some(dev))
+    };
 
     // Whole-label mirroring applies once, after the label is composed.
     let bitmap = build_label(args, print_width)?.mirrored(args.flip_h, args.flip_v);
@@ -992,11 +1064,8 @@ fn resolve_layout_target(
         })?;
         Ok((w, w as u16, None))
     } else {
-        let mut dev = CliDevice::open(args.bluetooth.as_deref(), args.usb)?;
-        #[allow(irrefutable_let_patterns)]
-        if let CliDevice::Usb(usb) = &mut dev {
-            usb.set_job_timeout(std::time::Duration::from_secs(u64::from(args.timeout)))?;
-        }
+        let mut dev = CliDevice::open(args.bluetooth.as_deref(), args.usb, args.host.as_deref())?;
+        dev.set_job_timeout(u64::from(args.timeout))?;
         dev.init()?;
         let printer_px = u32::from(dev.tape_width_px().ok_or_else(|| {
             PtouchError::StatusError("Could not determine tape width".to_string())
@@ -1004,7 +1073,7 @@ fn resolve_layout_target(
         // Warn on a real tape width mismatch. A pixel difference alone just
         // means the printer resolution differs from the design resolution,
         // and the refit to printer_px already handles that.
-        let printer_mm = dev.status().map(|s| s.media_width).unwrap_or(0);
+        let printer_mm = dev.media_width_mm().unwrap_or(0);
         if printer_mm > 0 && printer_mm != doc.tape_width_mm {
             eprintln!(
                 "WARN: layout saved for {}mm, printer has {}mm; refitting to printer tape",
@@ -1151,7 +1220,10 @@ fn print_to_device(
     args: &PrintArgs,
     is_last_row: bool,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let raster_lines = raster::bitmap_to_raster_lines(bitmap, max_px);
+    let raster_lines = match dev.band_left_px() {
+        Some(left) => raster::bitmap_to_raster_lines_at(bitmap, max_px, left),
+        None => raster::bitmap_to_raster_lines(bitmap, max_px),
+    };
 
     let total_copies = args.copies.max(1);
     for copy_idx in 0..total_copies {
@@ -1388,6 +1460,10 @@ mod tests {
     }
 
     impl PrintDevice for RecordingPrinter {
+        fn band_left_px(&self) -> Option<u16> {
+            None
+        }
+
         fn dpi(&self) -> u16 {
             180
         }
