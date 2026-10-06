@@ -612,6 +612,27 @@ impl NetworkPrinter {
         precut: bool,
         quality: PrintQuality,
     ) -> Result<()> {
+        let data = self.prepare_job(lines, chain_print, precut, quality, None)?;
+        let job_no = self.next_job.wrapping_sub(1).max(1);
+        debug!("Submitting {} bytes as LPR job {job_no}", data.len());
+        lpr_submit(self.endpoints.lpr, job_no, &data)?;
+        self.wait_for_completion()
+    }
+
+    /// Run every safety check and return the complete job bytes without
+    /// sending them (a CUPS filter hands them to its backend).
+    ///
+    /// `expected_width_mm` is the tape the user chose; the loaded tape must
+    /// match it. With `None`, the width read at `open` is the expectation.
+    /// All the refusals of [`print_raster`](Self::print_raster) apply.
+    pub fn prepare_job(
+        &mut self,
+        lines: &[Vec<u8>],
+        chain_print: bool,
+        precut: bool,
+        quality: PrintQuality,
+        expected_width_mm: Option<u8>,
+    ) -> Result<Vec<u8>> {
         if quality != PrintQuality::Standard {
             return Err(PtouchError::UnsupportedQuality(self.info.name.to_string()));
         }
@@ -627,11 +648,11 @@ impl NetworkPrinter {
             )));
         }
 
-        let before = self.media_width_mm;
+        let wanted = expected_width_mm.unwrap_or(self.media_width_mm);
         let now = self.refresh_media()?;
-        if before != 0 && now != before {
+        if wanted != 0 && now != wanted {
             return Err(PtouchError::StatusError(format!(
-                "Media changed from {before} mm to {now} mm since the label was laid out"
+                "Wrong tape: the label is for {wanted} mm but {now} mm is loaded"
             )));
         }
         if self.band_left_px().is_none() {
@@ -667,10 +688,7 @@ impl NetworkPrinter {
         }
         let mut data = protocol::cmd_init_p900();
         data.extend(chunks.into_iter().flatten());
-
-        debug!("Submitting {} bytes as LPR job {job_no}", data.len());
-        lpr_submit(self.endpoints.lpr, job_no, &data)?;
-        self.wait_for_completion()
+        Ok(data)
     }
 
     /// Nothing to release; present for symmetry with the USB device.
