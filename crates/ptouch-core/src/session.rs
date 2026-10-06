@@ -61,6 +61,7 @@ pub(crate) struct PrinterSession<T: Transport> {
     status_frames: StatusFrameBuffer,
     status: Option<PrinterStatus>,
     tape_width_px: Option<u16>,
+    band_left_px: Option<u16>,
     initialized: bool,
     pub(crate) cancellation: CancellationToken,
     pub(crate) job_timeout: Duration,
@@ -74,6 +75,7 @@ impl<T: Transport> PrinterSession<T> {
             status_frames: StatusFrameBuffer::new(),
             status: None,
             tape_width_px: None,
+            band_left_px: None,
             initialized: false,
             cancellation: CancellationToken::default(),
             job_timeout: Duration::from_secs(600),
@@ -92,6 +94,12 @@ impl<T: Transport> PrinterSession<T> {
     /// Get the tape width in pixels, if known.
     pub fn tape_width_px(&self) -> Option<u16> {
         self.tape_width_px
+    }
+
+    /// Left offset of the printable band in a raster line, for models that
+    /// place the band by per-media offsets. `None` means centre the band.
+    pub fn band_left_px(&self) -> Option<u16> {
+        self.band_left_px
     }
 
     /// Get the raster transfer width, which may exceed the printable area.
@@ -142,6 +150,9 @@ impl<T: Transport> PrinterSession<T> {
 
         // Send the init command (100 zeros + ESC @)
         match self.profile.dialect {
+            Dialect::Usb if self.profile.flags.contains(DeviceFlags::P900_RASTER) => {
+                self.send(&protocol::cmd_init_p900())?
+            }
             Dialect::Usb => self.send(&protocol::cmd_init())?,
             Dialect::P300Bt => self.send(&p300bt::cmd_init())?,
         }
@@ -263,7 +274,13 @@ impl<T: Transport> PrinterSession<T> {
 
         // Resolve tape width to pixel count for this printer's resolution,
         // clamped to the head width (wide tapes exceed narrow heads).
-        self.tape_width_px = self.profile.tape_width_px(status.media_width);
+        self.tape_width_px = self
+            .profile
+            .tape_width_px(status.media_type, status.media_width);
+        self.band_left_px = self
+            .profile
+            .head_band(status.media_type, status.media_width)
+            .map(|band| band.left_pins);
         if self.tape_width_px.is_none() && status.media_width != 0 {
             warn!("Unknown tape width: {} mm", status.media_width);
         }
@@ -321,11 +338,23 @@ impl<T: Transport> PrinterSession<T> {
             return result;
         }
 
+        self.check_media_for_job()?;
+        if self.profile.flags.contains(DeviceFlags::P900_RASTER) {
+            let expected = usize::from(self.profile.raster_width_px) / 8;
+            if lines.iter().any(|line| line.len() != expected) {
+                return Err(PtouchError::StatusError(format!(
+                    "Raster lines must be {expected} bytes for {}",
+                    self.profile.name
+                )));
+            }
+        }
         let opts = protocol::JobOptions {
             media_width: self.status.as_ref().map_or(0, |s| s.media_width),
+            media_type: self.status.as_ref().map_or(0, |s| s.media_type),
             chain_print,
             precut,
             quality,
+            ..protocol::JobOptions::default()
         };
 
         let job = protocol::build_print_job(lines, self.profile.flags, &opts);
@@ -365,10 +394,12 @@ impl<T: Transport> PrinterSession<T> {
             return Err(PtouchError::NotInitialized);
         }
 
+        self.check_media_for_job()?;
         // One blank line makes the printer engage the feed mechanism.
         let lines = vec![protocol::rasterline_blank(self.profile.raster_width_px)];
         let opts = protocol::JobOptions {
             media_width: self.status.as_ref().map_or(0, |s| s.media_width),
+            media_type: self.status.as_ref().map_or(0, |s| s.media_type),
             ..protocol::JobOptions::default()
         };
 
@@ -393,6 +424,24 @@ impl<T: Transport> PrinterSession<T> {
             return Err(error);
         }
         info!("Feed and cut");
+        Ok(())
+    }
+
+    /// Refuse to build a job for media a P900-class printer cannot validate.
+    fn check_media_for_job(&self) -> Result<()> {
+        if !self.profile.flags.contains(DeviceFlags::P900_RASTER) {
+            return Ok(());
+        }
+        let status = self.status.as_ref().ok_or(PtouchError::NotInitialized)?;
+        if protocol::info_media_type(status.media_type).is_none()
+            || self.tape_width_px.is_none()
+            || self.band_left_px.is_none()
+        {
+            return Err(PtouchError::StatusError(format!(
+                "Unsupported media: type {:#04x}, width {} mm",
+                status.media_type, status.media_width
+            )));
+        }
         Ok(())
     }
 
@@ -482,7 +531,9 @@ impl<T: Transport> PrinterSession<T> {
             Duration::from_secs(10),
             false,
         )?;
-        self.tape_width_px = self.profile.tape_width_px(status.media_width);
+        self.tape_width_px = self
+            .profile
+            .tape_width_px(status.media_type, status.media_width);
         self.status = Some(status);
         Ok(self.status.as_ref().unwrap())
     }
@@ -929,7 +980,7 @@ mod tests {
         session.init().unwrap();
         assert_eq!(session.raster_width_px(), 128);
         assert_eq!(session.tape_width_px(), Some(64));
-        assert_eq!(ModelProfile::P300BT.tape_width_px(9), None);
+        assert_eq!(ModelProfile::P300BT.tape_width_px(0x01, 9), None);
         let mut reset = vec![0; 64];
         reset.extend([0x1b, 0x40, 0x1b, 0x69, 0x61, 1]);
         assert_eq!(

@@ -224,6 +224,13 @@ impl PtouchDevice {
         self.session.tape_width_px()
     }
     /// Get the maximum printable pixels for this device.
+    /// Left offset of the printable band for models with per-media offsets
+    /// (`None`: centre the band). Pass it to
+    /// `ptouch_render::raster::bitmap_to_raster_lines_at`.
+    pub fn band_left_px(&self) -> Option<u16> {
+        self.session.band_left_px()
+    }
+
     pub fn max_px(&self) -> u16 {
         self.session.raster_width_px()
     }

@@ -49,8 +49,21 @@ impl ModelProfile {
         flags: DeviceFlags::NONE,
     };
 
-    pub(crate) fn tape_width_px(self, width_mm: u8) -> Option<u16> {
+    /// Printable band for the loaded media (status bytes 11 and 10), when the
+    /// model places the band by per-media offsets instead of centring it.
+    pub(crate) fn head_band(self, media_type: u8, width_mm: u8) -> Option<tape::HeadBand> {
+        if self.dialect == Dialect::Usb && self.flags.contains(DeviceFlags::P900_RASTER) {
+            tape::head_band_560(media_type, width_mm)
+        } else {
+            None
+        }
+    }
+
+    pub(crate) fn tape_width_px(self, media_type: u8, width_mm: u8) -> Option<u16> {
         match self.dialect {
+            Dialect::Usb if self.flags.contains(DeviceFlags::P900_RASTER) => self
+                .head_band(media_type, width_mm)
+                .map(|band| band.print_pins),
             Dialect::Usb => {
                 tape::tape_pixels(width_mm, self.dpi).map(|px| px.min(self.raster_width_px))
             }

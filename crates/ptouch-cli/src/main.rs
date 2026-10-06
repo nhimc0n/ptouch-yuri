@@ -1412,6 +1412,7 @@ mod tests {
                 chain_print,
                 precut,
                 quality,
+                ..Default::default()
             };
             let job = ptouch_core::protocol::build_print_job(lines, DeviceFlags::NONE, &opts);
             self.commands.borrow_mut().push(job.last().unwrap()[0]);
