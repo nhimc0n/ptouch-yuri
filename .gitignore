@@ -18,11 +18,16 @@ target
 # Contains mutation testing data
 **/mutants.out*/
 
-# IDE config files
-.claude
+# IDE config files (the E850 protocol skill under .claude/skills is tracked)
+.claude/*
+!.claude/skills/
+.DS_Store
 .cursor
 .tasks
 .vscode
 
 # Python packaging checks
 __pycache__/
+
+# Raw Wireshark captures stay local; extracted jobs live in fixtures/jobs
+fixtures/captures/*.pcapng

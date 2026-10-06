@@ -1,0 +1,23 @@
+{
+  "skill_name": "ptouch-e850-dev",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "máy in trả về cái này khi tôi gửi ESC i S, nghĩa là gì? 80 20 42 30 75 30 04 00 00 00 09 11 00 00 00 40 00 00 00 00 00 00 00 00 70 08 00 00 00 00 00 00",
+      "expected_output": "Decodes the block (HSe 8.8mm white tube, black text, AC power, no errors), flags model code 0x30/0x75 as not yet recorded and asks to log it as E850TKW evidence in raster-protocol.md.",
+      "files": []
+    },
+    {
+      "id": 2,
+      "prompt": "Thêm hỗ trợ ống co nhiệt HSe 8.8mm cho PT-E850TKW vào ptouch-core trong fork ptouch-rs.",
+      "expected_output": "Touches tape.rs (HSe entry, left margin 224 / 96 pins), cmd_info (type 0x11, flags 0x86), raster placement not centred; constants marked UNVERIFIED(E850) with P900 doc section; unit tests in upstream style; golden test vs build_job.py output.",
+      "files": []
+    },
+    {
+      "id": 3,
+      "prompt": "Tôi vừa capture được file job khi in ống co nhiệt 11.7mm bằng P-touch Editor, giờ làm gì tiếp?",
+      "expected_output": "Walks through extract_payload.py -> parse_stream.py (summary, ink span, PNG), says what to record (bytes/line, pin band, ESC i z/K values for HSe), updates tags + evidence log, then reproduces with build_job.py --pins/--left and diffs.",
+      "files": []
+    }
+  ]
+}
