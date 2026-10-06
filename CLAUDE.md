@@ -36,6 +36,7 @@ crates/
   ptouch-render/    bitmap, text, images, .ptl layouts, CSV templates               MIT (raster.rs GPL)
   ptouch-cli/       `ptouch` binary                                                  MIT
   ptouch-gui/       egui app                                                         MIT
+  ptouch-cups/      `rastertoptouch` CUPS filter: macOS print dialog -> label job    GPL-3.0+
 fixtures/                                   (ours)
   captures/         raw .pcapng from P-touch Editor (git-lfs)
   jobs/             extracted .bin + <name>.notes.md (media, settings, result)
@@ -130,6 +131,17 @@ infrastructure at 192.168.99.107 (set a DHCP reservation). USB is not working fr
 answers and probing it (PJL, bare `ESC i a 01`) put the printer into an error — do NOT probe 9100.
 36 mm band = pins 61..=514. Rust header matches Brother byte-for-byte (golden test).
 Code: `ptouch-core/src/network.rs` (`NetworkPrinter`), CLI `--host`.
+
+**Print from any app (macOS CUPS queue):** `ptouch-cups` is a CUPS raster filter; `data/cups/PT-E850TKW.ppd`
+declares LANDSCAPE label pages (length x 36 mm tape), 360 dpi, cut mode (half / full), imageable area =
+the 454-dot band (macOS then emits exactly the band). macOS (`cgpdftoraster`) renders the PDF, the filter
+checks the printer (SNMP idle, web page tape width == label's tape, known band) BEFORE writing a byte,
+then CUPS' built-in `lpd` backend delivers it to `lpd://<ip>/BINARY_P1`. One label per job (pages > 1 or
+copies > 1 are refused). Dry run without a printer:
+`cupsfilter -p data/cups/PT-E850TKW.ppd -m application/vnd.cups-raster in.pdf > in.ras` then
+`rastertoptouch --dry-run in.ras out.bin`. Install with `scripts/install-cups-macos.sh <ip>` (sudo,
+creates a system queue; NOT yet run). UNVERIFIED: CUPS' lpd backend against this printer; full cut
+(`ESC i K 08`); that the print dialog shows the Cut option; landscape page behaviour in browsers.
 
 **Open / next:**
 - TZe 9 mm: capture (or careful test print) to verify its band (currently the P900 table flipped, unverified).
