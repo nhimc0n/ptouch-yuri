@@ -1,0 +1,22 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+[package]
+name = "ptouch-cups"
+description = "CUPS raster filter that prints labels on the Brother PT-E850TKW"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license = "GPL-3.0-or-later"
+repository.workspace = true
+
+[lib]
+name = "ptouch_cups"
+path = "src/lib.rs"
+
+[[bin]]
+name = "rastertoptouch"
+path = "src/main.rs"
+
+[dependencies]
+ptouch-core = { path = "../ptouch-core" }
+ptouch-render = { path = "../ptouch-render" }

@@ -3113,6 +3113,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "ptouch-cups"
+version = "0.8.5"
+dependencies = [
+ "ptouch-core",
+ "ptouch-render",
+]
+
+[[package]]
 name = "ptouch-gui"
 version = "0.8.5"
 dependencies = [

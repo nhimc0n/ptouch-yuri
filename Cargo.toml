@@ -8,6 +8,7 @@ members = [
     "crates/ptouch-render",
     "crates/ptouch-cli",
     "crates/ptouch-gui",
+    "crates/ptouch-cups",
 ]
 
 [workspace.package]
