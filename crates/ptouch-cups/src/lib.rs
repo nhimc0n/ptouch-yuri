@@ -244,25 +244,17 @@ pub fn parse_options(text: &str) -> Options {
     options
 }
 
-/// Host name from a CUPS `DEVICE_URI` such as `lpd://192.168.99.107/BINARY_P1`.
-pub fn host_from_device_uri(uri: &str) -> Option<String> {
-    let rest = uri.split_once("://")?.1;
-    let authority = rest.split(['/', '?']).next()?;
-    let host = authority.rsplit('@').next()?;
-    let host = host.rsplit_once(':').map_or(host, |(h, port)| {
-        if port.chars().all(|c| c.is_ascii_digit()) {
-            h
-        } else {
-            host
-        }
-    });
-    (!host.is_empty()).then(|| host.trim_matches(['[', ']']).to_string())
-}
-
-/// Build the full job without contacting a printer. Used by `--dry-run` and
-/// tests; real printing goes through `NetworkPrinter::prepare_job`, which also
-/// checks the printer and the loaded tape.
-pub fn build_job_offline(label: &Label, options: &Options) -> Result<Vec<u8>> {
+/// Build the full job. Nothing here contacts the printer: CUPS runs filters
+/// in a sandbox without network access, so the tape check is left to the
+/// printer, which rejects a job whose `ESC i z` width flag (0x84) does not match
+/// the loaded cassette.
+///
+/// `job_number` goes into the ESC i U job tag like P-touch Editor does.
+pub fn build_job_offline(
+    label: &Label,
+    options: &Options,
+    job_number: Option<u8>,
+) -> Result<Vec<u8>> {
     let info =
         device::find_device_by_name("PT-E850TKW").ok_or("PT-E850TKW is not in the device table")?;
     let job_options = ptouch_core::protocol::JobOptions {
@@ -271,6 +263,7 @@ pub fn build_job_offline(label: &Label, options: &Options) -> Result<Vec<u8>> {
         precut: true,
         half_cut: options.cut == CutMode::Half,
         margin_dots: ptouch_core::protocol::MIN_MARGIN_DOTS,
+        job_number,
         ..Default::default()
     };
     let chunks = ptouch_core::protocol::build_print_job(&label.lines, info.flags, &job_options);
@@ -407,32 +400,19 @@ mod tests {
     }
 
     #[test]
-    fn options_and_device_uri() {
+    fn options_are_parsed() {
         assert_eq!(parse_options("").cut, CutMode::Half);
         assert_eq!(
             parse_options("CutMode=Full copies=1 foo").cut,
             CutMode::Full
         );
         assert_eq!(parse_options("copies=3").copies, 3);
-        assert_eq!(
-            host_from_device_uri("lpd://192.168.99.107/BINARY_P1").as_deref(),
-            Some("192.168.99.107")
-        );
-        assert_eq!(
-            host_from_device_uri("lpd://user@printer.local:515/q").as_deref(),
-            Some("printer.local")
-        );
-        assert_eq!(
-            host_from_device_uri("socket://[fe80::1]:9100").as_deref(),
-            Some("fe80::1")
-        );
-        assert_eq!(host_from_device_uri("not a uri"), None);
     }
 
     #[test]
     fn offline_job_starts_like_a_brother_job() {
         let label = page_to_label(&page(100, 510, |x, _| if x < 50 { 0 } else { 255 })).unwrap();
-        let job = build_job_offline(&label, &Options::default()).unwrap();
+        let job = build_job_offline(&label, &Options::default(), Some(7)).unwrap();
         assert_eq!(&job[..200], &[0u8; 200][..]);
         assert_eq!(&job[200..202], &[0x1B, 0x40]);
         assert_eq!(&job[202..206], &[0x1B, 0x69, 0x61, 0x01]);
@@ -443,6 +423,7 @@ mod tests {
                 cut: CutMode::Full,
                 copies: 1,
             },
+            None,
         )
         .unwrap();
         assert!(job.windows(4).any(|w| w == [0x1B, 0x69, 0x4B, 0x0C]));

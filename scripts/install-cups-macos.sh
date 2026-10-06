@@ -43,4 +43,4 @@ sudo chmod 644 "$DEST/PT-E850TKW.ppd"
 sudo lpadmin -p "$NAME" -E -v "lpd://$HOST/BINARY_P1" -P "$DEST/PT-E850TKW.ppd" \
     -D "Brother PT-E850TKW" -L "Label printer"
 echo "Done. Open any app, choose Print, and select '$NAME'."
-echo "Cassette must match the label size (36 mm); the filter checks this before printing."
+echo "Use a 36 mm cassette. The printer itself rejects a label whose width does not match the loaded tape."

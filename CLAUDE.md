@@ -115,6 +115,7 @@ claiming the interface fails (busy/access error).
 
 - Never send a job without first reading status and checking that loaded media type and
   width match the job's `ESC i z`. The transport layer enforces this; do not add bypasses.
+  (One owner-approved exception: the macOS CUPS filter, see Current status.)
 - Experiment on 12mm TZe, labels ≤ 30mm long. HSe only after the TZe path is verified.
 - Do not run a print against the real printer from an automated test or without Yuri
   explicitly asking for that print in the current session.
@@ -135,13 +136,20 @@ Code: `ptouch-core/src/network.rs` (`NetworkPrinter`), CLI `--host`.
 **Print from any app (macOS CUPS queue):** `ptouch-cups` is a CUPS raster filter; `data/cups/PT-E850TKW.ppd`
 declares LANDSCAPE label pages (length x 36 mm tape), 360 dpi, cut mode (half / full), imageable area =
 the 454-dot band (macOS then emits exactly the band). macOS (`cgpdftoraster`) renders the PDF, the filter
-checks the printer (SNMP idle, web page tape width == label's tape, known band) BEFORE writing a byte,
-then CUPS' built-in `lpd` backend delivers it to `lpd://<ip>/BINARY_P1`. One label per job (pages > 1 or
-copies > 1 are refused). Dry run without a printer:
+builds the job, CUPS' built-in `lpd` backend delivers it to `lpd://<ip>/BINARY_P1`. One label per job
+(pages > 1 or copies > 1 are refused). Dry run without a printer:
 `cupsfilter -p data/cups/PT-E850TKW.ppd -m application/vnd.cups-raster in.pdf > in.ras` then
-`rastertoptouch --dry-run in.ras out.bin`. Install with `scripts/install-cups-macos.sh <ip>` (sudo,
-creates a system queue; NOT yet run). UNVERIFIED: CUPS' lpd backend against this printer; full cut
-(`ESC i K 08`); that the print dialog shows the Cut option; landscape page behaviour in browsers.
+`rastertoptouch --dry-run in.ras out.bin`. Install/reinstall with `scripts/install-cups-macos.sh <ip>` (sudo).
+
+**Decision (Yuri, 2026-10-06): the CUPS path has NO pre-flight check.** macOS runs CUPS filters in a
+sandbox that forbids network access (first real job failed with `web connect: Operation not permitted`),
+so the filter cannot read printer state or tape width. The only guard is the printer itself: the job
+carries `ESC i z` flags 0x84 (width valid), and the printer rejects a width mismatch. This knowingly
+deviates from the hardware rule below; `ptouch print --host` keeps the full pre-flight (idle, tape
+width, known band) and should be preferred for HSe or any new media. If the deviation ever costs tape,
+reconsider a LaunchDaemon that polls the printer and writes a state file the filter reads.
+UNVERIFIED: CUPS' lpd backend against this printer; that the printer really rejects a wrong tape;
+full cut (`ESC i K 08`); that the print dialog shows the Cut option.
 
 **Open / next:**
 - TZe 9 mm: capture (or careful test print) to verify its band (currently the P900 table flipped, unverified).
