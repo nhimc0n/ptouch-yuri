@@ -223,6 +223,16 @@ pub fn page_to_label(page: &Page) -> Result<Label> {
         }
     }
     let lines = raster::bitmap_to_raster_lines_at(&bitmap, 560, band.left_pins);
+    // A blank label is never intended and can waste up to a metre of tape,
+    // typically because the document page does not match the label page
+    // (portrait page on a landscape label, or content outside the band).
+    if lines.iter().all(|line| line.iter().all(|b| *b == 0)) {
+        return Err(
+            "the label is blank: nothing falls inside the printable area. Check that the \
+             paper size is the label size (length x 36 mm, landscape) and the margins are None"
+                .into(),
+        );
+    }
     Ok(Label { tape_mm, lines })
 }
 
@@ -412,6 +422,23 @@ mod tests {
             "page row 28 is the first band row"
         );
         assert!(label.lines[1].iter().all(|b| *b == 0));
+    }
+
+    #[test]
+    fn rejects_a_blank_page_so_no_tape_is_wasted() {
+        let err = page_to_label(&page(2000, 510, |_, _| 255)).unwrap_err();
+        assert!(err.contains("blank"), "{err}");
+        // one dark pixel inside the band is enough
+        assert!(
+            page_to_label(&page(2000, 510, |x, y| if x == 5 && y == 255 {
+                0
+            } else {
+                255
+            }))
+            .is_ok()
+        );
+        // ink only in the 28 dot unprintable edge does not count
+        assert!(page_to_label(&page(2000, 510, |_, y| if y < 10 { 0 } else { 255 })).is_err());
     }
 
     #[test]
