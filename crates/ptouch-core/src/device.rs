@@ -42,6 +42,10 @@ bitflags! {
         const WAIT_FOR_RECEIVE_READY = 1 << 8;
         /// Device supports ESC i ! for configuring automatic status notification.
         const AUTO_STATUS_NOTIFICATION = 1 << 9;
+        /// PT-P900-class raster dialect (560 pin head): media-validated
+        /// ESC i z, explicit ESC i K/A/d header and per-media band offsets
+        /// instead of a centred band.
+        const P900_RASTER = 1 << 10;
     }
 }
 
@@ -339,6 +343,23 @@ static DEVICE_TABLE: &[DeviceInfo] = &[
             .union(DeviceFlags::USE_INFO_CMD)
             .union(DeviceFlags::D460BT_MAGIC),
     },
+    // UNVERIFIED(E850): the USB product ID is unknown until read from the real
+    // printer (`system_profiler SPUSBDataType`), so this entry uses PID 0 and
+    // never matches a device yet. Head geometry (560 pins, 360 dpi) is borrowed
+    // from the PT-P900 family. Fill in the PID in the same commit that records
+    // it in raster-protocol.md.
+    DeviceInfo {
+        vid: 0x04f9,
+        pid: 0x0000,
+        name: "PT-E850TKW",
+        max_px: 560,
+        dpi: 360,
+        flags: DeviceFlags::RASTER_PACKBITS
+            .union(DeviceFlags::P700_INIT)
+            .union(DeviceFlags::USE_INFO_CMD)
+            .union(DeviceFlags::HAS_PRECUT)
+            .union(DeviceFlags::P900_RASTER),
+    },
 ];
 
 /// Find a device by USB vendor and product ID.
@@ -347,6 +368,11 @@ static DEVICE_TABLE: &[DeviceInfo] = &[
 /// or `None` if not found.
 pub fn find_device(vid: u16, pid: u16) -> Option<&'static DeviceInfo> {
     DEVICE_TABLE.iter().find(|d| d.vid == vid && d.pid == pid)
+}
+
+/// Find a device by its model name (first table entry).
+pub fn find_device_by_name(name: &str) -> Option<&'static DeviceInfo> {
+    DEVICE_TABLE.iter().find(|d| d.name == name)
 }
 
 /// Returns the full list of supported devices.
@@ -376,7 +402,7 @@ mod tests {
 
     #[test]
     fn test_device_count() {
-        assert_eq!(supported_devices().len(), 31);
+        assert_eq!(supported_devices().len(), 32);
     }
 
     #[test]
@@ -388,6 +414,19 @@ mod tests {
         assert!(dev.flags.contains(DeviceFlags::RASTER_PACKBITS));
         assert!(dev.flags.contains(DeviceFlags::P700_INIT));
         assert!(dev.flags.contains(DeviceFlags::HAS_PRECUT));
+    }
+
+    #[test]
+    fn test_e850tkw_entry() {
+        let dev = supported_devices()
+            .iter()
+            .find(|d| d.name == "PT-E850TKW")
+            .unwrap();
+        assert_eq!((dev.max_px, dev.dpi), (560, 360));
+        assert!(dev.flags.contains(DeviceFlags::P900_RASTER));
+        assert!(dev.flags.contains(DeviceFlags::P700_INIT));
+        // 70 byte raster lines, as in the PT-P900 reference.
+        assert_eq!(dev.max_px / 8, 70);
     }
 
     #[test]

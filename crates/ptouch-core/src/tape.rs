@@ -118,6 +118,140 @@ static TAPE_TABLE_360: &[TapeInfo] = &[
     }, // 36 mm tape
 ];
 
+/// Printable band of one media on a 560 pin head, in pin indices.
+///
+/// Pin 0 is the MSB of the first byte of a raster line. The band is **not**
+/// centred on the head, so a renderer must place it at `left_pins`, the number
+/// of leading zero pins in raster-line byte order.
+///
+/// E850-verified for TZe 36 mm: P-touch Editor inks pins 61..=514 (captures 2
+/// and 3, 2026-10-06). That is the *right* margin column of the PT-P900
+/// reference table (45 left / 61 right), so every row below is that table
+/// flipped; the other widths are assumed to flip the same way.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct HeadBand {
+    /// Unused pins before the band.
+    pub left_pins: u16,
+    /// Number of printable pins across the media.
+    pub print_pins: u16,
+}
+
+/// Number of pins on a PT-P900-class head.
+pub const HEAD_560_PINS: u16 = 560;
+
+// Head geometry from the PT-P900 raster command reference v1.02, section 2.3.5
+// (raster-protocol.md section 7), flipped to byte order. Only the 36 mm row is
+// E850-verified; UNVERIFIED(E850) for the others. Keyed by the status width code.
+const BANDS_TZE_560: &[(u8, HeadBand)] = &[
+    (
+        4,
+        HeadBand {
+            left_pins: 264,
+            print_pins: 48,
+        },
+    ),
+    (
+        6,
+        HeadBand {
+            left_pins: 256,
+            print_pins: 64,
+        },
+    ),
+    (
+        9,
+        HeadBand {
+            left_pins: 235,
+            print_pins: 106,
+        },
+    ),
+    (
+        12,
+        HeadBand {
+            left_pins: 213,
+            print_pins: 150,
+        },
+    ),
+    (
+        18,
+        HeadBand {
+            left_pins: 171,
+            print_pins: 234,
+        },
+    ),
+    (
+        24,
+        HeadBand {
+            left_pins: 128,
+            print_pins: 320,
+        },
+    ),
+    (
+        36,
+        HeadBand {
+            left_pins: 61,
+            print_pins: 454,
+        },
+    ),
+];
+
+// UNVERIFIED(E850): same source and flip, HSe 2:1 rows. Width codes are the status
+// values (6 = 5.8 mm, 9 = 8.8 mm, 12 = 11.7 mm, 18 = 17.7 mm, 24 = 23.6 mm).
+const BANDS_HSE_560: &[(u8, HeadBand)] = &[
+    (
+        6,
+        HeadBand {
+            left_pins: 260,
+            print_pins: 56,
+        },
+    ),
+    (
+        9,
+        HeadBand {
+            left_pins: 240,
+            print_pins: 96,
+        },
+    ),
+    (
+        12,
+        HeadBand {
+            left_pins: 222,
+            print_pins: 132,
+        },
+    ),
+    (
+        18,
+        HeadBand {
+            left_pins: 182,
+            print_pins: 212,
+        },
+    ),
+    (
+        24,
+        HeadBand {
+            left_pins: 160,
+            print_pins: 256,
+        },
+    ),
+];
+
+/// Printable band for the media reported in a status reply, on a 560 pin head.
+///
+/// `media_type` and `width_mm` are status bytes 11 and 10. Returns `None` for
+/// media without a documented band (no media, incompatible, HSe 3:1, other
+/// tape families) so callers refuse to print instead of guessing.
+pub fn head_band_560(media_type: u8, width_mm: u8) -> Option<HeadBand> {
+    let table = match media_type {
+        // UNVERIFIED(E850): HGe is assumed to report as laminated tape.
+        0x01 | 0x03 => BANDS_TZE_560,
+        0x11 => BANDS_HSE_560,
+        _ => return None,
+    };
+    table
+        .iter()
+        .find(|(width, _)| *width == width_mm)
+        .map(|(_, band)| *band)
+}
+
 /// Select the tape table for a given print resolution.
 fn table_for_dpi(dpi: u16) -> &'static [TapeInfo] {
     if dpi >= 360 {
@@ -202,5 +336,37 @@ mod tests {
         assert_eq!(tape_pixels(36, 360), Some(454));
         // 21mm has no documented 360 dpi print area, doubled 180 dpi value
         assert_eq!(tape_pixels(21, 360), Some(248));
+    }
+
+    #[test]
+    fn head_band_560_matches_p900_table() {
+        // E850-verified: P-touch Editor 36 mm jobs ink pins 61..=514.
+        let band = head_band_560(0x01, 36).unwrap();
+        assert_eq!((band.left_pins, band.print_pins), (61, 454));
+        let band = head_band_560(0x01, 12).unwrap();
+        assert_eq!((band.left_pins, band.print_pins), (213, 150));
+        let band = head_band_560(0x11, 9).unwrap();
+        assert_eq!((band.left_pins, band.print_pins), (240, 96));
+    }
+
+    #[test]
+    fn head_band_560_fits_the_head_and_is_not_centred() {
+        for (_, band) in BANDS_TZE_560.iter().chain(BANDS_HSE_560) {
+            let right = HEAD_560_PINS - band.left_pins - band.print_pins;
+            assert!(band.left_pins + band.print_pins <= HEAD_560_PINS);
+            assert!(
+                band.left_pins > right,
+                "bands sit right of centre in byte order"
+            );
+        }
+    }
+
+    #[test]
+    fn head_band_560_refuses_unknown_media() {
+        assert!(head_band_560(0x00, 12).is_none()); // no media
+        assert!(head_band_560(0xFF, 12).is_none()); // incompatible
+        assert!(head_band_560(0x17, 12).is_none()); // HSe 3:1 not documented
+        assert!(head_band_560(0x01, 21).is_none()); // no such TZe width
+        assert!(head_band_560(0x11, 36).is_none()); // no 36 mm HSe
     }
 }
