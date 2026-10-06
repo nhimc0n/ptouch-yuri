@@ -21,12 +21,16 @@
 *Throughput: "1"
 *LandscapeOrientation: Plus90
 
+*% Page size "Auto" prints a label as long as its content: the filter trims the blank
+*% space at both ends (2 mm kept). Fixed sizes and Custom (15 mm - 1000 mm long,
+*% 36 mm wide) print the page length exactly.
 *% Label pages are LANDSCAPE: width = label length (feed), height = tape width.
 *% The top and bottom 2 mm (28 dots) of the 36 mm tape cannot be printed (band is 454 dots).
 *% Only TZe 36 mm is verified on the PT-E850TKW; other tape widths are added once verified.
 *OpenUI *PageSize/Label Size: PickOne
 *OrderDependency: 10 AnySetup *PageSize
-*DefaultPageSize: L100
+*DefaultPageSize: Auto
+*PageSize Auto/Auto length (up to 400 mm): "<</PageSize[1133.86 102.05]/ImagingBBox null>>setpagedevice"
 *PageSize L50/50 mm x 36 mm: "<</PageSize[141.73 102.05]/ImagingBBox null>>setpagedevice"
 *PageSize L75/75 mm x 36 mm: "<</PageSize[212.60 102.05]/ImagingBBox null>>setpagedevice"
 *PageSize L100/100 mm x 36 mm: "<</PageSize[283.46 102.05]/ImagingBBox null>>setpagedevice"
@@ -37,7 +41,8 @@
 
 *OpenUI *PageRegion/Label Size: PickOne
 *OrderDependency: 10 AnySetup *PageRegion
-*DefaultPageRegion: L100
+*DefaultPageRegion: Auto
+*PageRegion Auto/Auto length (up to 400 mm): "<</PageSize[1133.86 102.05]/ImagingBBox null>>setpagedevice"
 *PageRegion L50/50 mm x 36 mm: "<</PageSize[141.73 102.05]/ImagingBBox null>>setpagedevice"
 *PageRegion L75/75 mm x 36 mm: "<</PageSize[212.60 102.05]/ImagingBBox null>>setpagedevice"
 *PageRegion L100/100 mm x 36 mm: "<</PageSize[283.46 102.05]/ImagingBBox null>>setpagedevice"
@@ -46,14 +51,16 @@
 *PageRegion L300/300 mm x 36 mm: "<</PageSize[850.39 102.05]/ImagingBBox null>>setpagedevice"
 *CloseUI: *PageRegion
 
-*DefaultImageableArea: L100
+*DefaultImageableArea: Auto
+*ImageableArea Auto/Auto length (up to 400 mm): "0 5.60 1133.86 96.45"
 *ImageableArea L50/50 mm x 36 mm: "0 5.60 141.73 96.45"
 *ImageableArea L75/75 mm x 36 mm: "0 5.60 212.60 96.45"
 *ImageableArea L100/100 mm x 36 mm: "0 5.60 283.46 96.45"
 *ImageableArea L150/150 mm x 36 mm: "0 5.60 425.20 96.45"
 *ImageableArea L200/200 mm x 36 mm: "0 5.60 566.93 96.45"
 *ImageableArea L300/300 mm x 36 mm: "0 5.60 850.39 96.45"
-*DefaultPaperDimension: L100
+*DefaultPaperDimension: Auto
+*PaperDimension Auto/Auto length (up to 400 mm): "1133.86 102.05"
 *PaperDimension L50/50 mm x 36 mm: "141.73 102.05"
 *PaperDimension L75/75 mm x 36 mm: "212.60 102.05"
 *PaperDimension L100/100 mm x 36 mm: "283.46 102.05"
