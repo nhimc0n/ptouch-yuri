@@ -16,7 +16,8 @@
 //! file to a job file.
 
 use ptouch_cups::{
-    Label, Options, Result, build_job_offline, page_to_label, parse_options, read_raster,
+    AUTO_MARGIN_DOTS, Label, Options, Result, build_job_offline, page_to_label, parse_options,
+    read_raster,
 };
 use std::{
     env,
@@ -25,11 +26,17 @@ use std::{
     process::ExitCode,
 };
 
-fn load_label(input: impl Read) -> Result<Label> {
+fn load_label(input: impl Read, options: &Options) -> Result<Label> {
     let mut pages = read_raster(input)?;
     match pages.len() {
         0 => Err("the document has no pages".into()),
-        1 => page_to_label(&pages.remove(0)),
+        1 => {
+            let mut label = page_to_label(&pages.remove(0))?;
+            if options.auto_length {
+                label.trim_to_content(AUTO_MARGIN_DOTS, AUTO_MARGIN_DOTS)?;
+            }
+            Ok(label)
+        }
         n => Err(format!(
             "the job has {n} labels (pages or copies); print one label at a time"
         )),
@@ -41,7 +48,10 @@ fn dry_run(args: &[String]) -> Result<()> {
         return Err("usage: rastertoptouch --dry-run in.ras out.bin [options]".into());
     };
     let options = parse_options(&rest.join(" "));
-    let label = load_label(File::open(input).map_err(|e| format!("{input}: {e}"))?)?;
+    let label = load_label(
+        File::open(input).map_err(|e| format!("{input}: {e}"))?,
+        &options,
+    )?;
     let job = build_job_offline(&label, &options, Some(1))?;
     std::fs::write(output, &job).map_err(|e| format!("{output}: {e}"))?;
     eprintln!(
@@ -67,8 +77,11 @@ fn filter(args: &[String]) -> Result<()> {
     let job_number = u8::try_from(args[0].parse::<u32>().unwrap_or(1) % 255 + 1).unwrap_or(1);
 
     let label = match args.get(5) {
-        Some(path) => load_label(File::open(path).map_err(|e| format!("{path}: {e}"))?)?,
-        None => load_label(io::stdin().lock())?,
+        Some(path) => load_label(
+            File::open(path).map_err(|e| format!("{path}: {e}"))?,
+            &options,
+        )?,
+        None => load_label(io::stdin().lock(), &options)?,
     };
     let job = build_job_offline(&label, &options, Some(job_number))?;
     io::stdout()

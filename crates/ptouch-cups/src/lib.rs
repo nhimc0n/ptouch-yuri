@@ -151,6 +151,33 @@ pub struct Label {
     pub lines: Vec<Vec<u8>>,
 }
 
+/// Blank margin kept before and after the content in automatic length mode,
+/// in dots (2 mm). The printer adds its own 14 dot feed margin on top.
+pub const AUTO_MARGIN_DOTS: usize = 28;
+
+impl Label {
+    /// Shrink the label to its content: drop blank lines before the first and
+    /// after the last ink, keeping `lead` and `trail` blank lines, and pad up
+    /// to the printer's minimum length. Errors on a label with no ink at all.
+    pub fn trim_to_content(&mut self, lead: usize, trail: usize) -> Result<()> {
+        let inked = |line: &Vec<u8>| line.iter().any(|b| *b != 0);
+        let first = self
+            .lines
+            .iter()
+            .position(inked)
+            .ok_or("the label is blank; nothing to print")?;
+        let last = self.lines.iter().rposition(inked).unwrap_or(first);
+        let start = first.saturating_sub(lead);
+        let end = (last + 1 + trail).min(self.lines.len());
+        self.lines = self.lines[start..end].to_vec();
+        let blank = vec![0u8; self.lines[0].len()];
+        while self.lines.len() < MIN_LENGTH_DOTS as usize {
+            self.lines.push(blank.clone());
+        }
+        Ok(())
+    }
+}
+
 /// Convert a page to raster lines. Ink is any pixel darker than mid-gray.
 ///
 /// The page height must match a supported tape; the printable band is cut from
@@ -215,6 +242,9 @@ pub struct Options {
     pub cut: CutMode,
     /// Copies requested by the application.
     pub copies: u32,
+    /// Size the label to its content instead of the page length
+    /// (page size "Auto").
+    pub auto_length: bool,
 }
 
 impl Default for Options {
@@ -222,6 +252,7 @@ impl Default for Options {
         Self {
             cut: CutMode::Half,
             copies: 1,
+            auto_length: false,
         }
     }
 }
@@ -238,6 +269,7 @@ pub fn parse_options(text: &str) -> Options {
             ("cutmode", "full") => options.cut = CutMode::Full,
             ("cutmode", "half") => options.cut = CutMode::Half,
             ("copies", n) => options.copies = n.parse().unwrap_or(1).max(1),
+            ("pagesize", "auto") => options.auto_length = true,
             _ => {}
         }
     }
@@ -399,6 +431,47 @@ mod tests {
         assert!(page_to_label(&low_res).unwrap_err().contains("360"));
     }
 
+    fn label_with_ink_at(total: usize, ink: &[usize]) -> Label {
+        let mut lines = vec![vec![0u8; 70]; total];
+        for &i in ink {
+            lines[i][8] = 0x10;
+        }
+        Label { tape_mm: 36, lines }
+    }
+
+    #[test]
+    fn trimming_keeps_margins_around_the_content() {
+        let mut label = label_with_ink_at(1000, &[200, 500]);
+        label.trim_to_content(28, 28).unwrap();
+        // 200-28 .. 500+1+28  => 357 lines, ink at 28 and 328
+        assert_eq!(label.lines.len(), 357);
+        assert!(label.lines[28].iter().any(|b| *b != 0));
+        assert!(label.lines[328].iter().any(|b| *b != 0));
+        assert!(label.lines[0].iter().all(|b| *b == 0));
+        assert!(label.lines[356].iter().all(|b| *b == 0));
+    }
+
+    #[test]
+    fn trimming_clamps_at_the_edges_pads_short_labels_and_rejects_blank() {
+        let mut label = label_with_ink_at(100, &[2, 4]);
+        label.trim_to_content(28, 28).unwrap();
+        // content 2..=4 plus 28 trailing = 33 lines, padded to the 57 dot minimum
+        assert_eq!(label.lines.len(), MIN_LENGTH_DOTS as usize);
+        assert!(label.lines[2].iter().any(|b| *b != 0));
+        let mut tiny = label_with_ink_at(100, &[10]);
+        tiny.trim_to_content(0, 0).unwrap();
+        assert_eq!(tiny.lines.len(), MIN_LENGTH_DOTS as usize);
+        let mut blank = label_with_ink_at(100, &[]);
+        assert!(blank.trim_to_content(28, 28).unwrap_err().contains("blank"));
+    }
+
+    #[test]
+    fn auto_page_size_is_detected_from_the_options() {
+        assert!(parse_options("PageSize=Auto CutMode=Half").auto_length);
+        assert!(!parse_options("PageSize=L100").auto_length);
+        assert!(!parse_options("PageSize=Custom.425x102").auto_length);
+    }
+
     #[test]
     fn options_are_parsed() {
         assert_eq!(parse_options("").cut, CutMode::Half);
@@ -422,6 +495,7 @@ mod tests {
             &Options {
                 cut: CutMode::Full,
                 copies: 1,
+                ..Default::default()
             },
             None,
         )
