@@ -24,6 +24,9 @@
 *% Page size "Auto" prints a label as long as its content: the filter trims the blank
 *% space at both ends (2 mm kept). Fixed sizes and Custom (15 mm - 1000 mm long,
 *% 36 mm wide) print the page length exactly.
+*% Landscape pages (width = label length, height = 36 mm) and portrait pages (width = 36 mm,
+*% height = label length, the usual label-PDF layout) both work: the filter rotates portrait
+*% pages. For a custom size, one side must be 36 mm.
 *% Label pages are LANDSCAPE: width = label length (feed), height = tape width.
 *% The top and bottom 2 mm (28 dots) of the 36 mm tape cannot be printed (band is 454 dots).
 *% Only TZe 36 mm is verified on the PT-E850TKW; other tape widths are added once verified.
@@ -37,6 +40,12 @@
 *PageSize L150/150 mm x 36 mm: "<</PageSize[425.20 102.05]/ImagingBBox null>>setpagedevice"
 *PageSize L200/200 mm x 36 mm: "<</PageSize[566.93 102.05]/ImagingBBox null>>setpagedevice"
 *PageSize L300/300 mm x 36 mm: "<</PageSize[850.39 102.05]/ImagingBBox null>>setpagedevice"
+*PageSize P50/36 mm x 50 mm (portrait): "<</PageSize[102.05 141.73]/ImagingBBox null>>setpagedevice"
+*PageSize P75/36 mm x 75 mm (portrait): "<</PageSize[102.05 212.60]/ImagingBBox null>>setpagedevice"
+*PageSize P100/36 mm x 100 mm (portrait): "<</PageSize[102.05 283.46]/ImagingBBox null>>setpagedevice"
+*PageSize P150/36 mm x 150 mm (portrait): "<</PageSize[102.05 425.20]/ImagingBBox null>>setpagedevice"
+*PageSize P200/36 mm x 200 mm (portrait): "<</PageSize[102.05 566.93]/ImagingBBox null>>setpagedevice"
+*PageSize AutoP/Auto length, portrait (up to 400 mm): "<</PageSize[102.05 1133.86]/ImagingBBox null>>setpagedevice"
 *CloseUI: *PageSize
 
 *OpenUI *PageRegion/Label Size: PickOne
@@ -49,6 +58,12 @@
 *PageRegion L150/150 mm x 36 mm: "<</PageSize[425.20 102.05]/ImagingBBox null>>setpagedevice"
 *PageRegion L200/200 mm x 36 mm: "<</PageSize[566.93 102.05]/ImagingBBox null>>setpagedevice"
 *PageRegion L300/300 mm x 36 mm: "<</PageSize[850.39 102.05]/ImagingBBox null>>setpagedevice"
+*PageRegion P50/36 mm x 50 mm (portrait): "<</PageSize[102.05 141.73]/ImagingBBox null>>setpagedevice"
+*PageRegion P75/36 mm x 75 mm (portrait): "<</PageSize[102.05 212.60]/ImagingBBox null>>setpagedevice"
+*PageRegion P100/36 mm x 100 mm (portrait): "<</PageSize[102.05 283.46]/ImagingBBox null>>setpagedevice"
+*PageRegion P150/36 mm x 150 mm (portrait): "<</PageSize[102.05 425.20]/ImagingBBox null>>setpagedevice"
+*PageRegion P200/36 mm x 200 mm (portrait): "<</PageSize[102.05 566.93]/ImagingBBox null>>setpagedevice"
+*PageRegion AutoP/Auto length, portrait (up to 400 mm): "<</PageSize[102.05 1133.86]/ImagingBBox null>>setpagedevice"
 *CloseUI: *PageRegion
 
 *DefaultImageableArea: Auto
@@ -59,6 +74,12 @@
 *ImageableArea L150/150 mm x 36 mm: "0 5.60 425.20 96.45"
 *ImageableArea L200/200 mm x 36 mm: "0 5.60 566.93 96.45"
 *ImageableArea L300/300 mm x 36 mm: "0 5.60 850.39 96.45"
+*ImageableArea P50/36 mm x 50 mm (portrait): "5.60 0 96.45 141.73"
+*ImageableArea P75/36 mm x 75 mm (portrait): "5.60 0 96.45 212.60"
+*ImageableArea P100/36 mm x 100 mm (portrait): "5.60 0 96.45 283.46"
+*ImageableArea P150/36 mm x 150 mm (portrait): "5.60 0 96.45 425.20"
+*ImageableArea P200/36 mm x 200 mm (portrait): "5.60 0 96.45 566.93"
+*ImageableArea AutoP/Auto length, portrait (up to 400 mm): "5.60 0 96.45 1133.86"
 *DefaultPaperDimension: Auto
 *PaperDimension Auto/Auto length (up to 400 mm): "1133.86 102.05"
 *PaperDimension L50/50 mm x 36 mm: "141.73 102.05"
@@ -67,13 +88,19 @@
 *PaperDimension L150/150 mm x 36 mm: "425.20 102.05"
 *PaperDimension L200/200 mm x 36 mm: "566.93 102.05"
 *PaperDimension L300/300 mm x 36 mm: "850.39 102.05"
+*PaperDimension P50/36 mm x 50 mm (portrait): "102.05 141.73"
+*PaperDimension P75/36 mm x 75 mm (portrait): "102.05 212.60"
+*PaperDimension P100/36 mm x 100 mm (portrait): "102.05 283.46"
+*PaperDimension P150/36 mm x 150 mm (portrait): "102.05 425.20"
+*PaperDimension P200/36 mm x 200 mm (portrait): "102.05 566.93"
+*PaperDimension AutoP/Auto length, portrait (up to 400 mm): "102.05 1133.86"
 
 *MaxMediaWidth: "2834.65"
-*MaxMediaHeight: "102.05"
+*MaxMediaHeight: "2834.65"
 *HWMargins: 0 5.60 0 5.60
 *CustomPageSize True: "pop pop pop <</PageSize[5 -2 roll]/ImagingBBox null>>setpagedevice"
 *ParamCustomPageSize Width: 1 points 42.52 2834.65
-*ParamCustomPageSize Height: 2 points 102.05 102.05
+*ParamCustomPageSize Height: 2 points 42.52 2834.65
 *ParamCustomPageSize WidthOffset: 3 points 0 0
 *ParamCustomPageSize HeightOffset: 4 points 0 0
 *ParamCustomPageSize Orientation: 5 int 0 0
