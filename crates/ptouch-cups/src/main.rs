@@ -40,6 +40,9 @@ fn load_label(input: impl Read, options: &Options) -> Result<Label> {
                 // page so the label is as long as the size the user chose.
                 label.compensate_feed_margin()?;
             }
+            if options.mirror {
+                label.mirror();
+            }
             Ok(label)
         }
         n => Err(format!(

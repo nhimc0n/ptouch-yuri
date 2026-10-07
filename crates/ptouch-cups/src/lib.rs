@@ -204,6 +204,11 @@ pub struct Label {
 }
 
 impl Label {
+    /// Mirror the label along its length: the last line is printed first.
+    pub fn mirror(&mut self) {
+        self.lines.reverse();
+    }
+
     /// Factor between this label's feed dots and the 360 dpi values used for
     /// minimum lengths and margins.
     pub fn scale(&self) -> usize {
@@ -365,6 +370,10 @@ pub enum CutMode {
     Full,
     /// Cut the label but keep the backing (E850-verified).
     Half,
+    /// Do not cut: the tape is fed out to tear off. Bytes copied from the
+    /// quality captures (`ESC i M 00`, no `ESC i A`, `ESC i K 04`);
+    /// UNVERIFIED(E850) that this is what Editor's "no cut" sends.
+    None,
 }
 
 /// Print quality chosen in the print dialog.
@@ -390,6 +399,9 @@ pub struct Options {
     pub auto_length: bool,
     /// Print quality.
     pub quality: Quality,
+    /// Mirror the label along its length (to read it through the back of a
+    /// clear label). Done in software: the line order is reversed.
+    pub mirror: bool,
 }
 
 impl Default for Options {
@@ -399,6 +411,7 @@ impl Default for Options {
             copies: 1,
             auto_length: false,
             quality: Quality::Normal,
+            mirror: false,
         }
     }
 }
@@ -414,8 +427,10 @@ pub fn parse_options(text: &str) -> Options {
         ) {
             ("cutmode", "full") => options.cut = CutMode::Full,
             ("cutmode", "half") => options.cut = CutMode::Half,
+            ("cutmode", "none") => options.cut = CutMode::None,
+            ("mirror", "on" | "true" | "yes") => options.mirror = true,
             ("copies", n) => options.copies = n.parse().unwrap_or(1).max(1),
-            ("pagesize", "auto" | "autop") => options.auto_length = true,
+            ("pagesize", name) if name.starts_with("auto") => options.auto_length = true,
             ("labelquality", "normal") => options.quality = Quality::Normal,
             ("labelquality", "high") => options.quality = Quality::High,
             ("labelquality", "hires") => options.quality = Quality::HiRes,
@@ -449,8 +464,10 @@ pub fn build_job_offline(
     let job_options = ptouch_core::protocol::JobOptions {
         media_width: label.tape_mm,
         media_type: 0x01,
-        precut: true,
-        half_cut: options.cut == CutMode::Half,
+        precut: options.cut != CutMode::None,
+        no_cut: options.cut == CutMode::None,
+        // "None" keeps the half-cut bit like the capture it is copied from.
+        half_cut: options.cut != CutMode::Full,
         margin_dots: ptouch_core::protocol::MIN_MARGIN_DOTS * label.scale() as u16,
         job_number,
         quality: if hi_res {
@@ -800,6 +817,67 @@ mod tests {
         // option and page resolution must agree
         assert!(build_job_offline(&fine, &Options::default(), None).is_err());
         assert!(build_job_offline(&normal, &hires, None).is_err());
+    }
+
+    #[test]
+    fn cut_and_mirror_options_are_parsed() {
+        assert_eq!(parse_options("CutMode=None").cut, CutMode::None);
+        assert!(parse_options("Mirror=On").mirror);
+        assert!(!parse_options("Mirror=Off").mirror);
+        assert!(!parse_options("").mirror);
+        assert!(parse_options("PageSize=Auto9").auto_length);
+    }
+
+    #[test]
+    fn cut_modes_produce_the_matching_job_bytes() {
+        let label = page_to_label(&page(400, 454, |x, _| if x < 50 { 0 } else { 255 })).unwrap();
+        let build = |cut| {
+            let options = Options {
+                cut,
+                ..Options::default()
+            };
+            build_job_offline(&label, &options, None).unwrap()
+        };
+        let has = |job: &[u8], bytes: &[u8]| job.windows(bytes.len()).any(|w| w == bytes);
+        let half = build(CutMode::Half);
+        assert!(has(&half, &[0x1B, 0x69, 0x4D, 0x40]) && has(&half, &[0x1B, 0x69, 0x4B, 0x0C]));
+        let full = build(CutMode::Full);
+        assert!(has(&full, &[0x1B, 0x69, 0x4D, 0x40]) && has(&full, &[0x1B, 0x69, 0x4B, 0x08]));
+        let none = build(CutMode::None);
+        assert!(has(&none, &[0x1B, 0x69, 0x4D, 0x00]));
+        assert!(has(&none, &[0x1B, 0x69, 0x4B, 0x04]));
+        assert!(
+            !has(&none, &[0x1B, 0x69, 0x41]),
+            "no ESC i A without cutting"
+        );
+    }
+
+    #[test]
+    fn mirroring_reverses_the_feed_direction() {
+        let mut label = label_with_ink_at(100, &[10]);
+        label.mirror();
+        assert!(label.lines[89].iter().any(|b| *b != 0));
+        assert!(label.lines[10].iter().all(|b| *b == 0));
+        label.mirror();
+        assert!(label.lines[10].iter().any(|b| *b != 0));
+    }
+
+    #[test]
+    fn nine_mm_tape_is_recognised_in_both_orientations() {
+        // E850-verified band: pins 235..=340 (capture cap_9mm_new)
+        assert_eq!(tape_width_mm_for_height(106), Some(9));
+        assert_eq!(tape_width_mm_for_height(128), Some(9));
+        let label = page_to_label(&page(300, 106, |_, _| 0)).unwrap();
+        assert_eq!(label.tape_mm, 9);
+        let pins: Vec<usize> = (0..560)
+            .filter(|p| label.lines[0][p / 8] & (0x80 >> (p % 8)) != 0)
+            .collect();
+        assert_eq!(
+            (pins[0], *pins.last().unwrap(), pins.len()),
+            (235, 340, 106)
+        );
+        let portrait = page(106, 300, |_, y| if y < 100 { 0 } else { 255 });
+        assert_eq!(page_to_label(&portrait).unwrap().tape_mm, 9);
     }
 
     #[test]
