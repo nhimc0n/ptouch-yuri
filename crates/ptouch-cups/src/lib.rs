@@ -178,6 +178,32 @@ impl Label {
     }
 }
 
+/// Feed margin the printer adds before and after the printed data, in dots
+/// (`ESC i d`, minimum 14 = 1 mm each). E850-verified by measurement: a 50 mm
+/// page came out 52 mm and an 80 mm page 82 mm.
+pub const FEED_MARGIN_DOTS: usize = ptouch_core::protocol::MIN_MARGIN_DOTS as usize;
+
+impl Label {
+    /// Make the physical label as long as the page by dropping the part of the
+    /// page the printer's own feed margins already cover: `FEED_MARGIN_DOTS`
+    /// lines from each end (never going below the printer's minimum length).
+    /// Errors if that removes all the ink.
+    ///
+    /// UNVERIFIED(E850): that the two margins are one at each end; the total
+    /// (+2 mm) is measured, their split is not.
+    pub fn compensate_feed_margin(&mut self) -> Result<()> {
+        let spare = self.lines.len().saturating_sub(MIN_LENGTH_DOTS as usize);
+        let crop = (2 * FEED_MARGIN_DOTS).min(spare);
+        let front = crop / 2;
+        let end = self.lines.len() - (crop - front);
+        self.lines = self.lines[front..end].to_vec();
+        if self.lines.iter().all(|l| l.iter().all(|b| *b == 0)) {
+            return Err("the label is blank once the 1 mm feed margins are removed".into());
+        }
+        Ok(())
+    }
+}
+
 /// Convert a page to raster lines. Ink is any pixel darker than mid-gray.
 ///
 /// The page height must match a supported tape; the printable band is cut from
@@ -490,6 +516,31 @@ mod tests {
         assert_eq!(tiny.lines.len(), MIN_LENGTH_DOTS as usize);
         let mut blank = label_with_ink_at(100, &[]);
         assert!(blank.trim_to_content(28, 28).unwrap_err().contains("blank"));
+    }
+
+    #[test]
+    fn feed_margin_compensation_makes_the_label_as_long_as_the_page() {
+        let mut label = label_with_ink_at(1000, &[14, 500, 985]);
+        label.compensate_feed_margin().unwrap();
+        assert_eq!(label.lines.len(), 1000 - 2 * FEED_MARGIN_DOTS);
+        // content keeps its place relative to the label: page x=14 is now line 0
+        assert!(label.lines[0].iter().any(|b| *b != 0));
+        assert!(label.lines[500 - 14].iter().any(|b| *b != 0));
+        assert!(label.lines.last().unwrap().iter().any(|b| *b != 0));
+    }
+
+    #[test]
+    fn feed_margin_compensation_respects_the_minimum_length_and_blank_check() {
+        let mut short = label_with_ink_at(70, &[30]);
+        short.compensate_feed_margin().unwrap();
+        assert_eq!(short.lines.len(), MIN_LENGTH_DOTS as usize);
+        let mut edge_only = label_with_ink_at(1000, &[3]);
+        assert!(
+            edge_only
+                .compensate_feed_margin()
+                .unwrap_err()
+                .contains("blank")
+        );
     }
 
     #[test]

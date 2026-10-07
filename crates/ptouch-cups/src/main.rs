@@ -34,6 +34,10 @@ fn load_label(input: impl Read, options: &Options) -> Result<Label> {
             let mut label = page_to_label(&pages.remove(0))?;
             if options.auto_length {
                 label.trim_to_content(AUTO_MARGIN_DOTS, AUTO_MARGIN_DOTS)?;
+            } else {
+                // The printer adds ~1 mm feed margin at each end; take it out of the
+                // page so the label is as long as the size the user chose.
+                label.compensate_feed_margin()?;
             }
             Ok(label)
         }
