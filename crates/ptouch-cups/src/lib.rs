@@ -204,11 +204,6 @@ pub struct Label {
 }
 
 impl Label {
-    /// Mirror the label along its length: the last line is printed first.
-    pub fn mirror(&mut self) {
-        self.lines.reverse();
-    }
-
     /// Factor between this label's feed dots and the 360 dpi values used for
     /// minimum lengths and margins.
     pub fn scale(&self) -> usize {
@@ -399,9 +394,9 @@ pub struct Options {
     pub auto_length: bool,
     /// Print quality.
     pub quality: Quality,
-    /// Mirror the label along its length (to read it through the back of a
-    /// clear label). Done in software: the line order is reversed.
-    pub mirror: bool,
+    /// Chain printing (no feed or cut at the end, for continuous labels).
+    /// Not available yet: it needs a capture of a multi-label job.
+    pub chain: bool,
 }
 
 impl Default for Options {
@@ -411,24 +406,38 @@ impl Default for Options {
             copies: 1,
             auto_length: false,
             quality: Quality::Normal,
-            mirror: false,
+            chain: false,
         }
     }
 }
 
+/// Value of a boolean option as CUPS writes it (`True`, `False`, `on`, ...).
+fn truthy(value: &str) -> bool {
+    matches!(value, "true" | "on" | "yes" | "1")
+}
+
 /// Parse the CUPS option string (`key=value key2=value2 flag`).
+///
+/// Cutting is two check boxes in the print dialog: `FullCut` and `HalfCut`
+/// (half cut wins if both are ticked; neither means no cut). Mirror printing
+/// is the standard "Flip horizontally" option, which macOS applies to the
+/// raster itself, so it is deliberately not read here.
 pub fn parse_options(text: &str) -> Options {
     let mut options = Options::default();
+    let (mut half, mut full) = (true, false);
     for token in text.split_whitespace() {
         let (key, value) = token.split_once('=').unwrap_or((token, ""));
         match (
             key.to_ascii_lowercase().as_str(),
             value.to_ascii_lowercase().as_str(),
         ) {
-            ("cutmode", "full") => options.cut = CutMode::Full,
-            ("cutmode", "half") => options.cut = CutMode::Half,
-            ("cutmode", "none") => options.cut = CutMode::None,
-            ("mirror", "on" | "true" | "yes") => options.mirror = true,
+            ("halfcut", v) => half = truthy(v),
+            ("fullcut", v) => full = truthy(v),
+            ("chain", v) => options.chain = truthy(v),
+            // single-choice form, still accepted on the command line
+            ("cutmode", "full") => (half, full) = (false, true),
+            ("cutmode", "half") => (half, full) = (true, false),
+            ("cutmode", "none") => (half, full) = (false, false),
             ("copies", n) => options.copies = n.parse().unwrap_or(1).max(1),
             ("pagesize", name) if name.starts_with("auto") => options.auto_length = true,
             ("labelquality", "normal") => options.quality = Quality::Normal,
@@ -437,6 +446,13 @@ pub fn parse_options(text: &str) -> Options {
             _ => {}
         }
     }
+    options.cut = if half {
+        CutMode::Half
+    } else if full {
+        CutMode::Full
+    } else {
+        CutMode::None
+    };
     options
 }
 
@@ -820,12 +836,37 @@ mod tests {
     }
 
     #[test]
-    fn cut_and_mirror_options_are_parsed() {
+    fn cut_check_boxes_are_parsed() {
+        assert_eq!(parse_options("").cut, CutMode::Half); // default: half cut ticked
+        assert_eq!(
+            parse_options("HalfCut=True FullCut=False").cut,
+            CutMode::Half
+        );
+        assert_eq!(
+            parse_options("HalfCut=False FullCut=True").cut,
+            CutMode::Full
+        );
+        assert_eq!(
+            parse_options("HalfCut=False FullCut=False").cut,
+            CutMode::None
+        );
+        // both ticked: half cut wins (K bits are the same as half cut)
+        assert_eq!(
+            parse_options("HalfCut=True FullCut=True").cut,
+            CutMode::Half
+        );
         assert_eq!(parse_options("CutMode=None").cut, CutMode::None);
-        assert!(parse_options("Mirror=On").mirror);
-        assert!(!parse_options("Mirror=Off").mirror);
-        assert!(!parse_options("").mirror);
+        assert!(parse_options("Chain=True").chain);
+        assert!(!parse_options("Chain=False").chain);
+        assert!(!parse_options("").chain);
         assert!(parse_options("PageSize=Auto9").auto_length);
+    }
+
+    #[test]
+    fn the_standard_mirror_option_is_left_to_macos() {
+        // macOS flips the raster itself; reading it here would flip twice.
+        assert_eq!(parse_options("mirror=true"), Options::default());
+        assert_eq!(parse_options("Mirror=On"), Options::default());
     }
 
     #[test]
@@ -850,16 +891,6 @@ mod tests {
             !has(&none, &[0x1B, 0x69, 0x41]),
             "no ESC i A without cutting"
         );
-    }
-
-    #[test]
-    fn mirroring_reverses_the_feed_direction() {
-        let mut label = label_with_ink_at(100, &[10]);
-        label.mirror();
-        assert!(label.lines[89].iter().any(|b| *b != 0));
-        assert!(label.lines[10].iter().all(|b| *b == 0));
-        label.mirror();
-        assert!(label.lines[10].iter().any(|b| *b != 0));
     }
 
     #[test]

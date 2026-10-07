@@ -40,9 +40,6 @@ fn load_label(input: impl Read, options: &Options) -> Result<Label> {
                 // page so the label is as long as the size the user chose.
                 label.compensate_feed_margin()?;
             }
-            if options.mirror {
-                label.mirror();
-            }
             Ok(label)
         }
         n => Err(format!(
@@ -51,11 +48,25 @@ fn load_label(input: impl Read, options: &Options) -> Result<Label> {
     }
 }
 
+/// Chain printing has no verified byte sequence yet; refuse instead of guessing,
+/// since a wrong guess can leave the printer waiting for a page that never comes.
+fn refuse_chain(options: &Options) -> Result<()> {
+    if options.chain {
+        return Err(
+            "Chain printing is not available yet: it still has to be captured from \
+                    P-touch Editor. Untick Chain printing."
+                .into(),
+        );
+    }
+    Ok(())
+}
+
 fn dry_run(args: &[String]) -> Result<()> {
     let [input, output, rest @ ..] = args else {
         return Err("usage: rastertoptouch --dry-run in.ras out.bin [options]".into());
     };
     let options = parse_options(&rest.join(" "));
+    refuse_chain(&options)?;
     let label = load_label(
         File::open(input).map_err(|e| format!("{input}: {e}"))?,
         &options,
@@ -78,6 +89,7 @@ fn filter(args: &[String]) -> Result<()> {
     let mut options: Options = parse_options(&args[4]);
     // CUPS passes the copy count as the 4th argument, not in the option string.
     options.copies = options.copies.max(args[3].parse().unwrap_or(1));
+    refuse_chain(&options)?;
     if options.copies > 1 {
         return Err("print one copy at a time; multiple copies are not supported yet".into());
     }
