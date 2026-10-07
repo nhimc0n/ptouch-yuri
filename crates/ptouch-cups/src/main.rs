@@ -16,8 +16,8 @@
 //! file to a job file.
 
 use ptouch_cups::{
-    AUTO_MARGIN_DOTS, Label, Options, Result, build_job_offline, page_to_label, parse_options,
-    read_raster,
+    AUTO_MARGIN_DOTS, Label, Options, Result, build_job_offline, page_to_label, read_raster,
+    resolve_options,
 };
 use std::{
     env,
@@ -40,12 +40,28 @@ fn load_label(input: impl Read, options: &Options) -> Result<Label> {
                 // page so the label is as long as the size the user chose.
                 label.compensate_feed_margin()?;
             }
+            if options.flip() {
+                label.mirror();
+            }
             Ok(label)
         }
         n => Err(format!(
             "the job has {n} labels (pages or copies); print one label at a time"
         )),
     }
+}
+
+/// Options for this job: its own options over the queue defaults. CUPS gives the
+/// filter the queue's PPD in `$PPD`; its `*Default...` lines are the driver
+/// settings the settings app writes. If the file cannot be read (it always
+/// should be), say so and fall back to the built-in defaults.
+fn options_for(job_options: &str) -> Options {
+    let ppd = env::var("PPD").ok().and_then(|path| {
+        std::fs::read_to_string(&path)
+            .map_err(|e| eprintln!("INFO: cannot read the queue settings in {path}: {e}"))
+            .ok()
+    });
+    resolve_options(ppd.as_deref(), job_options)
 }
 
 /// Chain printing has no verified byte sequence yet; refuse instead of guessing,
@@ -65,7 +81,7 @@ fn dry_run(args: &[String]) -> Result<()> {
     let [input, output, rest @ ..] = args else {
         return Err("usage: rastertoptouch --dry-run in.ras out.bin [options]".into());
     };
-    let options = parse_options(&rest.join(" "));
+    let options = options_for(&rest.join(" "));
     refuse_chain(&options)?;
     let label = load_label(
         File::open(input).map_err(|e| format!("{input}: {e}"))?,
@@ -86,7 +102,7 @@ fn filter(args: &[String]) -> Result<()> {
     if args.len() < 5 {
         return Err("usage: rastertoptouch job-id user title copies options [file]".into());
     }
-    let mut options: Options = parse_options(&args[4]);
+    let mut options: Options = options_for(&args[4]);
     // CUPS passes the copy count as the 4th argument, not in the option string.
     options.copies = options.copies.max(args[3].parse().unwrap_or(1));
     refuse_chain(&options)?;

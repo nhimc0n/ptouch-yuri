@@ -204,6 +204,11 @@ pub struct Label {
 }
 
 impl Label {
+    /// Mirror the label along its length: the last line is printed first.
+    pub fn mirror(&mut self) {
+        self.lines.reverse();
+    }
+
     /// Factor between this label's feed dots and the 360 dpi values used for
     /// minimum lengths and margins.
     pub fn scale(&self) -> usize {
@@ -397,6 +402,19 @@ pub struct Options {
     /// Chain printing (no feed or cut at the end, for continuous labels).
     /// Not available yet: it needs a capture of a multi-label job.
     pub chain: bool,
+    /// Driver setting "Mirror print" (`MirrorPrint`).
+    pub mirror_print: bool,
+    /// The job carries the standard `mirror` option ("Flip horizontally" in the
+    /// print dialog): macOS has already flipped the raster.
+    pub system_mirror: bool,
+}
+
+impl Options {
+    /// Whether the filter has to mirror the label itself. If macOS already
+    /// flipped the page, flipping again would undo it.
+    pub fn flip(&self) -> bool {
+        self.mirror_print && !self.system_mirror
+    }
 }
 
 impl Default for Options {
@@ -407,8 +425,47 @@ impl Default for Options {
             auto_length: false,
             quality: Quality::Normal,
             chain: false,
+            mirror_print: false,
+            system_mirror: false,
         }
     }
+}
+
+/// Driver options whose queue default the filter honours.
+const DEFAULT_KEYS: [&str; 6] = [
+    "PageSize",
+    "HalfCut",
+    "FullCut",
+    "Chain",
+    "MirrorPrint",
+    "LabelQuality",
+];
+
+/// Turn the `*Default<Key>: <Value>` lines of the queue's PPD into an option
+/// string. These are the driver settings: `lpadmin -p <queue> -o Key=Value`
+/// (what the settings app does) rewrites exactly these lines.
+pub fn defaults_from_ppd(ppd: &str) -> String {
+    let mut out = Vec::new();
+    for line in ppd.lines() {
+        let Some(rest) = line.strip_prefix("*Default") else {
+            continue;
+        };
+        let Some((key, value)) = rest.split_once(':') else {
+            continue;
+        };
+        let value = value.split_whitespace().next().unwrap_or("");
+        if DEFAULT_KEYS.contains(&key.trim()) && !value.is_empty() {
+            out.push(format!("{}={value}", key.trim()));
+        }
+    }
+    out.join(" ")
+}
+
+/// Options for a job: an explicit job option wins over the queue default from
+/// the PPD, which wins over the built-in default.
+pub fn resolve_options(ppd: Option<&str>, job_options: &str) -> Options {
+    let defaults = ppd.map(defaults_from_ppd).unwrap_or_default();
+    parse_options(&format!("{defaults} {job_options}"))
 }
 
 /// Value of a boolean option as CUPS writes it (`True`, `False`, `on`, ...).
@@ -418,10 +475,12 @@ fn truthy(value: &str) -> bool {
 
 /// Parse the CUPS option string (`key=value key2=value2 flag`).
 ///
-/// Cutting is two check boxes in the print dialog: `FullCut` and `HalfCut`
-/// (half cut wins if both are ticked; neither means no cut). Mirror printing
-/// is the standard "Flip horizontally" option, which macOS applies to the
-/// raster itself, so it is deliberately not read here.
+/// Later tokens override earlier ones, so queue defaults go first and the job's
+/// own options after them (see [`resolve_options`]).
+///
+/// Cutting is two check boxes: `FullCut` and `HalfCut` (half cut wins if both
+/// are ticked; neither means no cut). `MirrorPrint` is the driver's mirror
+/// setting; the standard `mirror` option means macOS already flipped the page.
 pub fn parse_options(text: &str) -> Options {
     let mut options = Options::default();
     let (mut half, mut full) = (true, false);
@@ -434,12 +493,15 @@ pub fn parse_options(text: &str) -> Options {
             ("halfcut", v) => half = truthy(v),
             ("fullcut", v) => full = truthy(v),
             ("chain", v) => options.chain = truthy(v),
+            ("mirrorprint", v) => options.mirror_print = truthy(v),
+            ("mirror", v) => options.system_mirror = truthy(v),
             // single-choice form, still accepted on the command line
             ("cutmode", "full") => (half, full) = (false, true),
             ("cutmode", "half") => (half, full) = (true, false),
             ("cutmode", "none") => (half, full) = (false, false),
             ("copies", n) => options.copies = n.parse().unwrap_or(1).max(1),
-            ("pagesize", name) if name.starts_with("auto") => options.auto_length = true,
+            // a later page size replaces an earlier one (job option over queue default)
+            ("pagesize" | "media", name) => options.auto_length = name.starts_with("auto"),
             ("labelquality", "normal") => options.quality = Quality::Normal,
             ("labelquality", "high") => options.quality = Quality::High,
             ("labelquality", "hires") => options.quality = Quality::HiRes,
@@ -863,10 +925,55 @@ mod tests {
     }
 
     #[test]
-    fn the_standard_mirror_option_is_left_to_macos() {
-        // macOS flips the raster itself; reading it here would flip twice.
-        assert_eq!(parse_options("mirror=true"), Options::default());
-        assert_eq!(parse_options("Mirror=On"), Options::default());
+    fn mirror_is_done_once_whoever_asks_for_it() {
+        assert!(!parse_options("").flip());
+        // driver setting alone: the filter flips
+        assert!(parse_options("MirrorPrint=True").flip());
+        // "Flip horizontally" in the dialog: macOS flipped already, do nothing
+        assert!(!parse_options("mirror=true").flip());
+        // both: still exactly one flip, the one macOS did
+        assert!(!parse_options("MirrorPrint=True mirror=true").flip());
+        assert!(!parse_options("MirrorPrint=False").flip());
+    }
+
+    #[test]
+    fn mirroring_reverses_the_feed_direction() {
+        let mut label = label_with_ink_at(100, &[10]);
+        label.mirror();
+        assert!(label.lines[89].iter().any(|b| *b != 0));
+        assert!(label.lines[10].iter().all(|b| *b == 0));
+    }
+
+    const PPD: &str = "*DefaultPageSize: Auto\n*DefaultHalfCut: False\n*DefaultFullCut: True\n\
+                       *DefaultChain: False\n*DefaultMirrorPrint: True\n*DefaultLabelQuality: High\n\
+                       *DefaultResolution: 360dpi\n*HalfCut True/Half cut: \"\"\n*DefaultFont: Courier\n";
+
+    #[test]
+    fn queue_defaults_are_read_from_the_ppd() {
+        assert_eq!(
+            defaults_from_ppd(PPD),
+            "PageSize=Auto HalfCut=False FullCut=True Chain=False MirrorPrint=True LabelQuality=High"
+        );
+        assert_eq!(defaults_from_ppd("no defaults here"), "");
+    }
+
+    #[test]
+    fn job_options_win_over_queue_defaults_which_win_over_built_ins() {
+        // nothing anywhere: built-in defaults
+        assert_eq!(resolve_options(None, ""), Options::default());
+        // queue defaults (what the settings app writes) apply to a job that says nothing
+        let from_queue = resolve_options(Some(PPD), "");
+        assert_eq!(from_queue.cut, CutMode::Full);
+        assert_eq!(from_queue.quality, Quality::High);
+        assert!(from_queue.flip() && from_queue.auto_length);
+        // an explicit job option overrides the queue default, the rest stays
+        let job = resolve_options(Some(PPD), "HalfCut=True LabelQuality=Normal PageSize=L50");
+        assert_eq!(job.cut, CutMode::Half);
+        assert_eq!(job.quality, Quality::Normal);
+        assert!(!job.auto_length, "a fixed size replaces the Auto default");
+        assert!(job.flip(), "untouched setting keeps the queue default");
+        // a custom media chosen in the dialog also replaces the Auto default
+        assert!(!resolve_options(Some(PPD), "media=Custom.226x102").auto_length);
     }
 
     #[test]
