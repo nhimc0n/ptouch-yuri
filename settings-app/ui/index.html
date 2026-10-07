@@ -1,0 +1,102 @@
+<!doctype html>
+<!-- SPDX-License-Identifier: GPL-3.0-or-later -->
+<html lang="vi">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="color-scheme" content="light dark" />
+  <title>Máy in nhãn PT-E850TKW</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="app">
+    <main class="page" id="page">
+      <header class="head">
+        <h1>Cài đặt máy in nhãn</h1>
+        <p>Brother PT-E850TKW. Chọn một lần, áp dụng cho mọi ứng dụng khi in.</p>
+      </header>
+
+      <section class="card status" id="status" aria-live="polite" aria-label="Trạng thái máy in"></section>
+      <div class="alerts" id="alerts"></div>
+
+      <div id="form">
+        <section class="card" aria-labelledby="h-cut">
+          <h2 id="h-cut">Cắt nhãn</h2>
+          <div class="rows">
+            <label class="row">
+              <input type="checkbox" id="half_cut" />
+              <span class="row-text">
+                <span class="row-title">Cắt nửa, giữ lớp giấy lót</span>
+                <span class="row-desc">Cắt qua lớp nhãn nhưng giữ giấy lót, dễ bóc và dễ cầm.</span>
+              </span>
+            </label>
+            <label class="row">
+              <input type="checkbox" id="full_cut" />
+              <span class="row-text">
+                <span class="row-title">Cắt đứt hẳn</span>
+                <span class="row-desc">Cắt rời cả nhãn lẫn giấy lót sau mỗi lần in.</span>
+              </span>
+            </label>
+          </div>
+          <p class="note">Bật cả hai thì cắt nửa được ưu tiên. Tắt cả hai thì máy không cắt, nhãn được đẩy ra để xé tay.</p>
+        </section>
+
+        <section class="card" aria-labelledby="h-mode">
+          <h2 id="h-mode">Chế độ in</h2>
+          <div class="rows">
+            <label class="row">
+              <input type="checkbox" id="mirror" />
+              <span class="row-text">
+                <span class="row-title">In lật chữ (như soi gương)</span>
+                <span class="row-desc">Dùng khi đọc nhãn xuyên từ mặt sau, ví dụ nhãn trong suốt dán lên kính.</span>
+              </span>
+            </label>
+            <label class="row is-locked">
+              <input type="checkbox" id="chain" disabled />
+              <span class="row-text">
+                <span class="row-title">In liền, không cắt giữa các nhãn <span class="tag"><svg class="icon" data-i="lock"></svg>Chưa dùng được</span></span>
+                <span class="row-desc">Cần ghi lại cách máy nhận nhiều nhãn liền nhau. Sẽ có ở bản sau.</span>
+              </span>
+            </label>
+          </div>
+        </section>
+
+        <section class="card" aria-labelledby="h-quality">
+          <h2 id="h-quality">Chất lượng in</h2>
+          <fieldset class="choices" id="quality"></fieldset>
+        </section>
+
+        <section class="card" aria-labelledby="h-size">
+          <h2 id="h-size">Khổ nhãn mặc định</h2>
+          <p class="hint">Dùng khi ứng dụng không chọn khổ. Khổ tự động cắt bỏ phần trắng, nhãn dài vừa nội dung.</p>
+          <div class="select" id="size"></div>
+        </section>
+      </div>
+
+      <section class="card" id="conn" aria-labelledby="h-conn">
+        <h2 id="h-conn">Kết nối</h2>
+        <label class="field" for="host">Địa chỉ máy in</label>
+        <div class="field-row">
+          <input class="input" id="host" inputmode="url" autocomplete="off" spellcheck="false" placeholder="192.168.99.107" />
+          <button class="btn btn-outline" id="save-host" type="button">Lưu địa chỉ</button>
+        </div>
+        <p class="hint">Địa chỉ IP của máy in trong mạng. Nên đặt IP cố định trên router để khỏi phải đổi.</p>
+        <div class="actions">
+          <button class="btn btn-outline" type="button" disabled><svg class="icon" data-i="printer"></svg>In thử nhãn</button>
+          <button class="btn btn-outline" type="button" disabled><svg class="icon" data-i="refresh"></svg>Cài lại driver</button>
+          <span class="soon">Sắp có</span>
+        </div>
+      </section>
+    </main>
+
+    <footer class="bar" id="bar">
+      <p class="bar-text" id="bar-text" role="status"></p>
+      <div class="bar-actions">
+        <button class="btn btn-outline" id="reset" type="button">Khôi phục mặc định</button>
+        <button class="btn btn-primary" id="apply" type="button">Áp dụng</button>
+      </div>
+    </footer>
+  </div>
+  <script src="main.js"></script>
+</body>
+</html>

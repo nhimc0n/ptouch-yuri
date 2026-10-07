@@ -1,0 +1,28 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "Cài đặt máy in nhãn",
+  "version": "0.1.0",
+  "identifier": "vn.fiora.ptouch-settings",
+  "build": {
+    "frontendDist": "../ui"
+  },
+  "app": {
+    "withGlobalTauri": true,
+    "windows": [
+      {
+        "title": "Máy in nhãn PT-E850TKW",
+        "width": 720,
+        "height": 800,
+        "minWidth": 560,
+        "minHeight": 560,
+        "resizable": true
+      }
+    ],
+    "security": { "csp": null }
+  },
+  "bundle": {
+    "active": false,
+    "targets": "app",
+    "icon": ["icons/32x32.png", "icons/128x128.png", "icons/icon.icns", "icons/icon.png"]
+  }
+}
