@@ -17,8 +17,8 @@
           <p data-i18n="head.sub"></p>
         </div>
         <div class="lang" role="group" data-i18n-aria="lang.label" id="lang">
-          <button type="button" data-lang="vi" title="Tiếng Việt">VI</button>
-          <button type="button" data-lang="en" title="English">EN</button>
+          <button type="button" data-lang="vi" lang="vi" aria-label="Tiếng Việt" title="Tiếng Việt">VI</button>
+          <button type="button" data-lang="en" lang="en" aria-label="English" title="English">EN</button>
         </div>
       </header>
 
@@ -69,7 +69,7 @@
 
         <section class="card" aria-labelledby="h-quality">
           <h2 id="h-quality" data-i18n="quality.h"></h2>
-          <fieldset class="choices" id="quality"></fieldset>
+          <fieldset class="choices" id="quality" aria-labelledby="h-quality"></fieldset>
         </section>
 
         <section class="card" aria-labelledby="h-size">
@@ -83,10 +83,11 @@
         <h2 id="h-conn" data-i18n="conn.h"></h2>
         <label class="field" for="host" data-i18n="conn.label"></label>
         <div class="field-row">
-          <input class="input" id="host" inputmode="url" autocomplete="off" spellcheck="false" placeholder="192.168.99.107" />
+          <input class="input" id="host" inputmode="url" autocomplete="off" spellcheck="false" placeholder="192.168.99.107" aria-describedby="host-error host-hint" />
           <button class="btn btn-outline" id="save-host" type="button" data-i18n="conn.save"></button>
         </div>
-        <p class="hint" data-i18n="conn.hint"></p>
+        <p class="field-error" id="host-error" role="alert" hidden></p>
+        <p class="hint" id="host-hint" data-i18n="conn.hint"></p>
         <div class="actions">
           <button class="btn btn-outline" type="button" disabled><svg class="icon" data-i="printer"></svg><span data-i18n="conn.test"></span></button>
           <button class="btn btn-outline" type="button" disabled><svg class="icon" data-i="refresh"></svg><span data-i18n="conn.reinstall"></span></button>

@@ -21,6 +21,18 @@ const ICONS = {
   warn: '<path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/>',
   alert: '<circle cx="12" cy="12" r="10"/><line x1="12" x2="12" y1="8" y2="12"/><line x1="12" x2="12.01" y1="16" y2="16"/>',
 };
+// Replace an element's markup only when it changed, so screen readers do not
+// re-announce the same content and a focused control inside is not destroyed
+// for nothing. When it is replaced, keyboard focus goes back to the same id.
+const painted = new WeakMap();
+function setMarkup(el, html) {
+  if (painted.get(el) === html) return false;
+  const focusId = el.contains(document.activeElement) ? document.activeElement.id : "";
+  el.innerHTML = html;
+  painted.set(el, html);
+  if (focusId) document.getElementById(focusId)?.focus();
+  return true;
+}
 const icon = (name) => `<svg class="icon" viewBox="0 0 24 24" aria-hidden="true">${ICONS[name]}</svg>`;
 const paintStaticIcons = () => {
   for (const el of document.querySelectorAll("svg.icon[data-i]")) {
@@ -52,6 +64,7 @@ async function call(command, args) {
     if (mode === "chua-cai") throw "The print queue PT-E850TKW was not found. Install the driver first.";
     return structuredClone(MOCK.settings);
   }
+  if (command === "set_printer_host" && !/^[\w.-]+$/.test(args.host.trim())) throw "Enter the printer's IP address or host name, for example 192.168.99.107.";
   if (command === "get_printer") return structuredClone(MOCK.printers[mode] || MOCK.printers.ok);
   return null;
 }
@@ -75,7 +88,7 @@ const DEFAULTS = { half_cut: true, full_cut: false, chain: false, mirror: false,
 
 // ---------------------------------------------------------------- state
 const $ = (id) => document.getElementById(id);
-const state = { saved: null, form: null, printer: null, loadingPrinter: true, queueError: false, applied: false, applying: false, error: null };
+const state = { saved: null, form: null, printer: null, loadingPrinter: true, queueError: false, applied: false, applying: false, error: null, hostError: null };
 const keys = ["half_cut", "full_cut", "chain", "mirror", "quality", "page_size"];
 const isDirty = () => !!state.saved && keys.some((k) => state.form[k] !== state.saved[k]);
 
@@ -85,7 +98,7 @@ function renderStatus() {
   const info = state.printer;
   if (state.loadingPrinter && !info) {
     box.dataset.tone = "none";
-    box.innerHTML = `<div class="skeleton" style="width:48px;height:48px;border-radius:12px"></div><div class="status-text"><div class="skeleton" style="width:160px;height:20px"></div><div class="skeleton" style="width:240px;height:16px;margin-top:8px"></div></div>`;
+    setMarkup(box, `<div class="skeleton" style="width:48px;height:48px;border-radius:12px"></div><div class="status-text"><div class="skeleton" style="width:160px;height:20px"></div><div class="skeleton" style="width:240px;height:16px;margin-top:8px"></div></div>`);
     return;
   }
   const st = info?.status;
@@ -102,10 +115,10 @@ function renderStatus() {
   const want = state.form ? sizeInfo(state.form.page_size).tape : 0;
   const tapeOk = st && st.tape_supported && (!want || want === st.tape_mm);
   const tape = st ? `<span class="badge" data-tone="${tapeOk ? "ok" : "warn"}">${t("st.tape", { mm: st.tape_mm })}</span>` : "";
-  box.innerHTML = `<div class="status-icon">${icon("printer")}</div>
+  const changed = setMarkup(box, `<div class="status-icon">${icon("printer")}</div>
     <div class="status-text"><div class="status-title">${title}</div><div class="status-sub">${sub}</div></div>
-    <div class="status-side">${tape}<button class="icon-btn" id="refresh" type="button" aria-label="${t("st.refresh")}" title="${t("st.refresh")}" ${state.loadingPrinter ? 'aria-busy="true"' : ""}>${icon("refresh")}</button></div>`;
-  $("refresh").addEventListener("click", loadPrinter);
+    <div class="status-side">${tape}<button class="icon-btn" id="refresh" type="button" aria-label="${t("st.refresh")}" title="${t("st.refresh")}" ${state.loadingPrinter ? 'aria-busy="true"' : ""}>${icon("refresh")}</button></div>`);
+  if (changed) $("refresh").addEventListener("click", loadPrinter);
 }
 
 function banner(tone, iconName, title, desc, action) {
@@ -135,10 +148,10 @@ function renderAlerts() {
         state.form.page_sizes?.includes(suggest) ? { id: "fix-size", label: t("b.mismatch.a", { have: st.tape_mm }) } : null));
     }
   }
-  $("alerts").innerHTML = out.join("");
+  if (!setMarkup($("alerts"), out.join(""))) return;
   for (const button of document.querySelectorAll("[data-act]")) {
     button.addEventListener("click", () => {
-      if (button.dataset.act === "refresh") loadPrinter();
+      if (button.dataset.act === "refresh") { loadPrinter(); $("refresh")?.focus(); }
       if (button.dataset.act === "fix-size") { state.form.page_size = state.printer.status.tape_mm === 9 ? "Auto9" : "Auto"; state.applied = false; renderAll(); }
     });
   }
@@ -154,17 +167,48 @@ function renderQuality() {
 }
 
 let openSelect = false;
+function setOpen(open, focusButton = false) {
+  const list = $("size-list"), button = $("size-btn");
+  openSelect = open;
+  list.hidden = !open;
+  button.setAttribute("aria-expanded", String(open));
+  if (open) (list.querySelector('[aria-selected="true"]') || list.querySelector(".select-item"))?.focus();
+  else if (focusButton) button.focus();
+}
+
 function renderSize() {
+  openSelect = false;
   const sizes = state.form.page_sizes?.length ? state.form.page_sizes : [state.form.page_size];
   const groups = new Map();
   for (const key of sizes) { const g = sizeInfo(key).group; groups.set(g, [...(groups.get(g) || []), key]); }
-  const list = [...groups].map(([group, items]) => `<div role="group" aria-label="${t(group)}"><div class="select-group">${t(group)}</div>${items.map((key) =>
-    `<button class="select-item" type="button" role="option" data-key="${key}" aria-selected="${key === state.form.page_size}"><span>${sizeText(key)}</span>${key === state.form.page_size ? icon("check") : ""}</button>`).join("")}</div>`).join("");
-  $("size").innerHTML = `<button class="select-btn" type="button" id="size-btn" aria-haspopup="listbox" aria-expanded="${openSelect}" aria-labelledby="h-size size-btn"><span>${sizeText(state.form.page_size)}</span>${icon("chevron")}</button><div class="select-list" role="listbox" aria-labelledby="h-size" id="size-list" ${openSelect ? "" : "hidden"}>${list}</div>`;
-  $("size-btn").addEventListener("click", (event) => { event.stopPropagation(); openSelect = !openSelect; renderSize(); if (openSelect) $("size-list").querySelector('[aria-selected="true"]')?.scrollIntoView({ block: "nearest" }); });
+  const list = [...groups].map(([group, items]) => `<div role="group" aria-label="${t(group)}"><div class="select-group" aria-hidden="true">${t(group)}</div>${items.map((key) =>
+    `<button class="select-item" type="button" role="option" tabindex="-1" data-key="${key}" aria-selected="${key === state.form.page_size}"><span>${sizeText(key)}</span>${key === state.form.page_size ? icon("check") : ""}</button>`).join("")}</div>`).join("");
+  $("size").innerHTML = `<button class="select-btn" type="button" id="size-btn" aria-haspopup="listbox" aria-expanded="false" aria-labelledby="h-size size-btn"><span>${sizeText(state.form.page_size)}</span>${icon("chevron")}</button><div class="select-list" role="listbox" aria-labelledby="h-size" id="size-list" hidden>${list}</div>`;
+  $("size-btn").addEventListener("click", () => setOpen(!openSelect));
   for (const item of document.querySelectorAll(".select-item")) {
-    item.addEventListener("click", () => { state.form.page_size = item.dataset.key; state.applied = false; openSelect = false; renderAll(); });
+    item.addEventListener("click", () => { state.form.page_size = item.dataset.key; state.applied = false; renderAll(); $("size-btn").focus(); });
   }
+}
+
+/** Keyboard for the size picker: arrows open and move, Home/End jump, Tab and Escape close. */
+function onSelectKey(event) {
+  if (event.target.id === "size-btn") {
+    if (event.key === "ArrowDown" || event.key === "ArrowUp") { event.preventDefault(); setOpen(true); }
+    return;
+  }
+  const items = [...document.querySelectorAll(".select-item")];
+  const at = items.indexOf(document.activeElement);
+  if (at < 0) return;
+  const move = { ArrowDown: Math.min(at + 1, items.length - 1), ArrowUp: Math.max(at - 1, 0), Home: 0, End: items.length - 1 }[event.key];
+  if (move !== undefined) { event.preventDefault(); items[move].focus(); }
+  else if (event.key === "Tab") setOpen(false, true); // focus the button, then Tab moves on from it
+}
+
+function renderHostError() {
+  const box = $("host-error");
+  box.hidden = !state.hostError;
+  box.textContent = state.hostError ? errorText(state.hostError) : "";
+  if (state.hostError) $("host").setAttribute("aria-invalid", "true"); else $("host").removeAttribute("aria-invalid");
 }
 
 function renderBar() {
@@ -190,7 +234,7 @@ function renderAll() {
   $("bar").hidden = !ready;
   $("conn").hidden = state.queueError;
   if (ready) { renderChecks(); renderQuality(); renderSize(); }
-  renderStatus(); renderAlerts(); renderBar();
+  renderStatus(); renderAlerts(); renderBar(); renderHostError();
 }
 
 // ---------------------------------------------------------------- actions
@@ -229,18 +273,17 @@ async function apply() {
 async function saveHost() {
   const input = $("host");
   const button = $("save-host");
-  input.removeAttribute("aria-invalid");
-  state.error = null;
+  state.hostError = null; renderHostError();
   button.setAttribute("aria-busy", "true");
   try {
     await call("set_printer_host", { host: input.value });
     await loadPrinter();
   } catch (error) {
-    input.setAttribute("aria-invalid", "true");
-    state.error = errorText(error);
+    state.hostError = error;
+    renderHostError();
+    input.focus();
   }
   button.removeAttribute("aria-busy");
-  renderBar();
 }
 
 function changeLanguage(next) {
@@ -260,9 +303,11 @@ for (const id of ["half_cut", "full_cut", "mirror"]) {
 $("apply").addEventListener("click", apply);
 $("reset").addEventListener("click", () => { Object.assign(state.form, DEFAULTS); state.applied = false; renderAll(); });
 $("save-host").addEventListener("click", saveHost);
+$("host").addEventListener("input", () => { if (state.hostError) { state.hostError = null; renderHostError(); } });
 $("host").addEventListener("keydown", (event) => { if (event.key === "Enter") saveHost(); });
-document.addEventListener("click", (event) => { if (openSelect && !event.target.closest("#size")) { openSelect = false; renderSize(); } });
-document.addEventListener("keydown", (event) => { if (event.key === "Escape" && openSelect) { openSelect = false; renderSize(); $("size-btn").focus(); } });
+$("size").addEventListener("keydown", onSelectKey);
+document.addEventListener("click", (event) => { if (openSelect && !event.target.closest("#size")) setOpen(false); });
+document.addEventListener("keydown", (event) => { if (event.key === "Escape" && openSelect) setOpen(false, true); });
 
 renderStatus();
 $("form").hidden = true; $("bar").hidden = true;
