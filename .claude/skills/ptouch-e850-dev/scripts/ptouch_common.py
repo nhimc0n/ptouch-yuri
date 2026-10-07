@@ -79,7 +79,7 @@ HEAD_BYTES_PER_LINE = 70
 HEAD_GEOMETRY = {
     "tze3.5": (264, 48, False),
     "tze6": (256, 64, False),
-    "tze9": (235, 106, False),
+    "tze9": (235, 106, True),
     "tze12": (213, 150, False),
     "tze18": (171, 234, False),
     "tze24": (128, 320, False),
