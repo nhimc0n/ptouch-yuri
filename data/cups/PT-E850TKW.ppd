@@ -21,6 +21,8 @@
 *Throughput: "1"
 *LandscapeOrientation: Plus90
 
+*% 9 mm tape (band verified on the printer) has its own sizes; for any custom size one side
+*% must be the tape width (9 or 36 mm).
 *% Page size "Auto" prints a label as long as its content: the filter trims the blank
 *% space at both ends (2 mm kept). Fixed sizes and Custom (15 mm - 1000 mm long,
 *% 36 mm wide) print the page length exactly.
@@ -46,6 +48,10 @@
 *PageSize P150/36 mm x 150 mm (portrait): "<</PageSize[102.05 425.20]/ImagingBBox null>>setpagedevice"
 *PageSize P200/36 mm x 200 mm (portrait): "<</PageSize[102.05 566.93]/ImagingBBox null>>setpagedevice"
 *PageSize AutoP/Auto length, portrait (up to 400 mm): "<</PageSize[102.05 1133.86]/ImagingBBox null>>setpagedevice"
+*PageSize Auto9/Auto length, 9 mm tape (up to 400 mm): "<</PageSize[1133.86 25.51]/ImagingBBox null>>setpagedevice"
+*PageSize S9L50/50 mm x 9 mm: "<</PageSize[141.73 25.51]/ImagingBBox null>>setpagedevice"
+*PageSize S9L100/100 mm x 9 mm: "<</PageSize[283.46 25.51]/ImagingBBox null>>setpagedevice"
+*PageSize S9L200/200 mm x 9 mm: "<</PageSize[566.93 25.51]/ImagingBBox null>>setpagedevice"
 *CloseUI: *PageSize
 
 *OpenUI *PageRegion/Label Size: PickOne
@@ -64,6 +70,10 @@
 *PageRegion P150/36 mm x 150 mm (portrait): "<</PageSize[102.05 425.20]/ImagingBBox null>>setpagedevice"
 *PageRegion P200/36 mm x 200 mm (portrait): "<</PageSize[102.05 566.93]/ImagingBBox null>>setpagedevice"
 *PageRegion AutoP/Auto length, portrait (up to 400 mm): "<</PageSize[102.05 1133.86]/ImagingBBox null>>setpagedevice"
+*PageRegion Auto9/Auto length, 9 mm tape (up to 400 mm): "<</PageSize[1133.86 25.51]/ImagingBBox null>>setpagedevice"
+*PageRegion S9L50/50 mm x 9 mm: "<</PageSize[141.73 25.51]/ImagingBBox null>>setpagedevice"
+*PageRegion S9L100/100 mm x 9 mm: "<</PageSize[283.46 25.51]/ImagingBBox null>>setpagedevice"
+*PageRegion S9L200/200 mm x 9 mm: "<</PageSize[566.93 25.51]/ImagingBBox null>>setpagedevice"
 *CloseUI: *PageRegion
 
 *DefaultImageableArea: Auto
@@ -80,6 +90,10 @@
 *ImageableArea P150/36 mm x 150 mm (portrait): "5.60 0 96.45 425.20"
 *ImageableArea P200/36 mm x 200 mm (portrait): "5.60 0 96.45 566.93"
 *ImageableArea AutoP/Auto length, portrait (up to 400 mm): "5.60 0 96.45 1133.86"
+*ImageableArea Auto9/Auto length, 9 mm tape (up to 400 mm): "0 2.16 1133.86 23.36"
+*ImageableArea S9L50/50 mm x 9 mm: "0 2.16 141.73 23.36"
+*ImageableArea S9L100/100 mm x 9 mm: "0 2.16 283.46 23.36"
+*ImageableArea S9L200/200 mm x 9 mm: "0 2.16 566.93 23.36"
 *DefaultPaperDimension: Auto
 *PaperDimension Auto/Auto length (up to 400 mm): "1133.86 102.05"
 *PaperDimension L50/50 mm x 36 mm: "141.73 102.05"
@@ -94,23 +108,53 @@
 *PaperDimension P150/36 mm x 150 mm (portrait): "102.05 425.20"
 *PaperDimension P200/36 mm x 200 mm (portrait): "102.05 566.93"
 *PaperDimension AutoP/Auto length, portrait (up to 400 mm): "102.05 1133.86"
+*PaperDimension Auto9/Auto length, 9 mm tape (up to 400 mm): "1133.86 25.51"
+*PaperDimension S9L50/50 mm x 9 mm: "141.73 25.51"
+*PaperDimension S9L100/100 mm x 9 mm: "283.46 25.51"
+*PaperDimension S9L200/200 mm x 9 mm: "566.93 25.51"
 
 *MaxMediaWidth: "2834.65"
 *MaxMediaHeight: "2834.65"
 *HWMargins: 0 5.60 0 5.60
 *CustomPageSize True: "pop pop pop <</PageSize[5 -2 roll]/ImagingBBox null>>setpagedevice"
-*ParamCustomPageSize Width: 1 points 42.52 2834.65
-*ParamCustomPageSize Height: 2 points 42.52 2834.65
+*ParamCustomPageSize Width: 1 points 25.51 2834.65
+*ParamCustomPageSize Height: 2 points 25.51 2834.65
 *ParamCustomPageSize WidthOffset: 3 points 0 0
 *ParamCustomPageSize HeightOffset: 4 points 0 0
 *ParamCustomPageSize Orientation: 5 int 0 0
 
+*OpenGroup: General/General
 *OpenUI *Resolution/Resolution: PickOne
 *OrderDependency: 20 AnySetup *Resolution
 *DefaultResolution: 360dpi
 *Resolution 360dpi/Standard 360 x 360 dpi: "<</HWResolution[360 360]>>setpagedevice"
 *CloseUI: *Resolution
 
+*OpenUI *ColorModel/Color Mode: PickOne
+*OrderDependency: 10 AnySetup *ColorModel
+*DefaultColorModel: Gray
+*ColorModel Gray/Black and white: "<</cupsColorSpace 0/cupsColorOrder 0/cupsBitsPerColor 8>>setpagedevice"
+*CloseUI: *ColorModel
+*CloseGroup: General
+
+*OpenGroup: Label/Label Options
+*OpenUI *CutMode/Cut Mode: PickOne
+*OrderDependency: 30 AnySetup *CutMode
+*DefaultCutMode: Half
+*CutMode Half/Half cut - cut the label, keep the backing paper: ""
+*CutMode Full/Full cut - cut through the label and the backing paper: ""
+*CutMode None/No cut - feed the tape out and tear it off by hand: ""
+*CloseUI: *CutMode
+
+*OpenUI *Mirror/Mirror Print: PickOne
+*OrderDependency: 31 AnySetup *Mirror
+*DefaultMirror: Off
+*Mirror Off/Off - normal print: ""
+*Mirror On/On - mirror image, to read through a clear label: ""
+*CloseUI: *Mirror
+*CloseGroup: Label
+
+*OpenGroup: Quality/Print Quality
 *OpenUI *LabelQuality/Print Quality: PickOne
 *OrderDependency: 25 AnySetup *LabelQuality
 *DefaultLabelQuality: Normal
@@ -118,17 +162,5 @@
 *LabelQuality High/High quality (slower, same resolution): "<</HWResolution[360 360]>>setpagedevice"
 *LabelQuality HiRes/High resolution (360 x 720 dpi, slowest): "<</HWResolution[720 720]>>setpagedevice"
 *CloseUI: *LabelQuality
-
-*OpenUI *ColorModel/Color Mode: PickOne
-*OrderDependency: 10 AnySetup *ColorModel
-*DefaultColorModel: Gray
-*ColorModel Gray/Black and white: "<</cupsColorSpace 0/cupsColorOrder 0/cupsBitsPerColor 8>>setpagedevice"
-*CloseUI: *ColorModel
-
-*OpenUI *CutMode/Cut: PickOne
-*OrderDependency: 30 AnySetup *CutMode
-*DefaultCutMode: Half
-*CutMode Half/Half cut (keep the backing): ""
-*CutMode Full/Full cut: ""
-*CloseUI: *CutMode
+*CloseGroup: Quality
 
