@@ -2,11 +2,14 @@
 //
 // UI only. It never builds printer bytes: it reads and writes the driver
 // settings and shows the printer's state through the Tauri commands in
-// src-tauri/src/main.rs. Outside Tauri (a plain browser) it runs on made-up
-// data so every state can be looked at: ?m=ok|loi|dang-in|mat-ket-noi|chua-cai|tai
+// src-tauri/src/main.rs. All text comes from i18n.js (Vietnamese or English).
+// Outside Tauri (a plain browser) it runs on made-up data so every state can be
+// looked at: ?m=ok|loi|dang-in|mat-ket-noi|chua-cai|tai   (&lang=en to force English)
 
 const tauri = window.__TAURI__?.core;
-const mode = new URLSearchParams(location.search).get("m") || "ok";
+const params = new URLSearchParams(location.search);
+const mode = params.get("m") || "ok";
+if (params.get("lang") === "en" || params.get("lang") === "vi") lang = params.get("lang");
 
 // ---------------------------------------------------------------- icons
 const ICONS = {
@@ -54,30 +57,25 @@ async function call(command, args) {
 }
 
 // ---------------------------------------------------------------- sizes
-const SIZE_LABELS = { Auto: "Tự động theo nội dung, nhãn ngang", AutoP: "Tự động theo nội dung, nhãn dọc", Auto9: "Tự động theo nội dung" };
 function sizeInfo(key) {
   const fixed = key.match(/^L(\d+)$/);
   const portrait = key.match(/^P(\d+)$/);
   const nine = key.match(/^S9L(\d+)$/);
-  if (key === "Auto" || key === "AutoP") return { group: "Tự động theo nội dung", label: SIZE_LABELS[key], extra: "băng 36 mm", tape: 36 };
-  if (key === "Auto9") return { group: "Tự động theo nội dung", label: SIZE_LABELS[key], extra: "băng 9 mm", tape: 9 };
-  if (fixed) return { group: "Cố định, băng 36 mm, nhãn ngang", label: `${fixed[1]} × 36 mm`, extra: "", tape: 36 };
-  if (portrait) return { group: "Cố định, băng 36 mm, nhãn dọc", label: `36 × ${portrait[1]} mm`, extra: "", tape: 36 };
-  if (nine) return { group: "Cố định, băng 9 mm", label: `${nine[1]} × 9 mm`, extra: "", tape: 9 };
-  return { group: "Khác", label: key, extra: "", tape: 0 };
+  if (key === "Auto" || key === "AutoP") return { group: "size.g.auto", label: t(`size.${key}`), extra: t("size.tape", { mm: 36 }), tape: 36 };
+  if (key === "Auto9") return { group: "size.g.auto", label: t("size.Auto9"), extra: t("size.tape", { mm: 9 }), tape: 9 };
+  if (fixed) return { group: "size.g.l36", label: `${fixed[1]} × 36 mm`, extra: "", tape: 36 };
+  if (portrait) return { group: "size.g.p36", label: `36 × ${portrait[1]} mm`, extra: "", tape: 36 };
+  if (nine) return { group: "size.g.s9", label: `${nine[1]} × 9 mm`, extra: "", tape: 9 };
+  return { group: "size.g.other", label: key, extra: "", tape: 0 };
 }
 const sizeText = (key) => { const s = sizeInfo(key); return s.extra ? `${s.label} · ${s.extra}` : s.label; };
 
-const QUALITIES = [
-  { key: "Normal", title: "Thường", meta: "360 × 360 dpi", desc: "Nhanh, đủ rõ cho hầu hết nhãn." },
-  { key: "High", title: "Chất lượng cao", meta: "chậm hơn", desc: "In chậm hơn để nét đều hơn, cùng độ phân giải." },
-  { key: "HiRes", title: "Độ phân giải cao", meta: "360 × 720 dpi", desc: "Chậm nhất, mịn hơn theo chiều dọc băng. Chỉ dùng cho băng TZe phủ nhựa." },
-];
+const QUALITY_KEYS = ["Normal", "High", "HiRes"];
 const DEFAULTS = { half_cut: true, full_cut: false, chain: false, mirror: false, quality: "Normal", page_size: "Auto" };
 
 // ---------------------------------------------------------------- state
 const $ = (id) => document.getElementById(id);
-const state = { saved: null, form: null, printer: null, loadingPrinter: true, queueError: null, applied: false, applying: false, error: null };
+const state = { saved: null, form: null, printer: null, loadingPrinter: true, queueError: false, applied: false, applying: false, error: null };
 const keys = ["half_cut", "full_cut", "chain", "mirror", "quality", "page_size"];
 const isDirty = () => !!state.saved && keys.some((k) => state.form[k] !== state.saved[k]);
 
@@ -87,22 +85,26 @@ function renderStatus() {
   const info = state.printer;
   if (state.loadingPrinter && !info) {
     box.dataset.tone = "none";
-    box.innerHTML = `<div class="skeleton" style="width:44px;height:44px;border-radius:12px"></div><div class="status-text"><div class="skeleton" style="width:160px;height:20px"></div><div class="skeleton" style="width:240px;height:16px;margin-top:8px"></div></div>`;
+    box.innerHTML = `<div class="skeleton" style="width:48px;height:48px;border-radius:12px"></div><div class="status-text"><div class="skeleton" style="width:160px;height:20px"></div><div class="skeleton" style="width:240px;height:16px;margin-top:8px"></div></div>`;
     return;
   }
   const st = info?.status;
-  let tone = "none", title = "Không kết nối được máy in", sub = info?.host ? `Địa chỉ ${info.host}` : "Chưa có địa chỉ máy in";
+  let tone = "none";
+  let title = t("st.noconn");
+  let sub = info?.host ? t("st.address", { host: info.host }) : t("st.noaddress");
   if (st) {
     sub = `${st.model} · ${info.host}`;
-    ({ idle: () => { tone = "ok"; title = "Sẵn sàng in"; }, printing: () => { tone = "busy"; title = "Máy đang in"; }, error: () => { tone = "bad"; title = "Máy báo lỗi"; }, warmup: () => { tone = "warn"; title = "Máy đang khởi động"; } }[st.state] || (() => { tone = "warn"; title = "Chưa rõ trạng thái"; }))();
+    const map = { idle: ["ok", "st.idle"], printing: ["busy", "st.printing"], error: ["bad", "st.error"], warmup: ["warn", "st.warmup"] };
+    const [tn, key] = map[st.state] || ["warn", "st.unknown"];
+    tone = tn; title = t(key);
   } else if (info?.error) tone = "bad";
   box.dataset.tone = tone;
   const want = state.form ? sizeInfo(state.form.page_size).tape : 0;
   const tapeOk = st && st.tape_supported && (!want || want === st.tape_mm);
-  const tape = st ? `<span class="badge" data-tone="${tapeOk ? "ok" : "warn"}">Băng ${st.tape_mm} mm</span>` : "";
+  const tape = st ? `<span class="badge" data-tone="${tapeOk ? "ok" : "warn"}">${t("st.tape", { mm: st.tape_mm })}</span>` : "";
   box.innerHTML = `<div class="status-icon">${icon("printer")}</div>
     <div class="status-text"><div class="status-title">${title}</div><div class="status-sub">${sub}</div></div>
-    <div class="status-side">${tape}<button class="icon-btn" id="refresh" type="button" aria-label="Làm mới trạng thái" ${state.loadingPrinter ? 'aria-busy="true"' : ""}>${icon("refresh")}</button></div>`;
+    <div class="status-side">${tape}<button class="icon-btn" id="refresh" type="button" aria-label="${t("st.refresh")}" title="${t("st.refresh")}" ${state.loadingPrinter ? 'aria-busy="true"' : ""}>${icon("refresh")}</button></div>`;
   $("refresh").addEventListener("click", loadPrinter);
 }
 
@@ -117,36 +119,37 @@ function renderAlerts() {
   const info = state.printer;
   const st = info?.status;
   if (state.queueError) {
-    out.push(banner("bad", "alert", "Chưa cài driver", "Không tìm thấy hàng đợi in PT-E850TKW. Cài driver bằng scripts/install-cups-macos.sh rồi mở lại app."));
+    out.push(banner("bad", "alert", t("b.noqueue.t"), t("b.noqueue.d")));
   } else if (!state.loadingPrinter && !st) {
-    out.push(banner("bad", "alert", "Không kết nối được máy in", `Kiểm tra máy in đã bật và cùng mạng với máy tính, hoặc sửa địa chỉ ở mục Kết nối. Chi tiết: ${info?.error || "không có phản hồi"}.`, { id: "refresh", label: "Thử lại" }));
+    out.push(banner("bad", "alert", t("b.noconn.t"), t("b.noconn.d", { detail: info?.error || t("b.noconn.none") }), { id: "refresh", label: t("b.retry") }));
   } else if (st?.state === "error") {
-    out.push(banner("bad", "alert", "Máy in đang báo lỗi", "Xem thông báo trên màn hình máy in, bấm Huỷ trên máy hoặc mở nắp rồi đóng lại. Xong thì bấm Làm mới.", { id: "refresh", label: "Làm mới" }));
+    out.push(banner("bad", "alert", t("b.error.t"), t("b.error.d"), { id: "refresh", label: t("b.refresh") }));
   }
   if (st && !st.tape_supported) {
-    out.push(banner("warn", "warn", `Băng ${st.tape_mm} mm chưa được hỗ trợ`, "Hiện chỉ in được băng TZe 9 mm và 36 mm."));
+    out.push(banner("warn", "warn", t("b.unsupported.t", { mm: st.tape_mm }), t("b.unsupported.d")));
   } else if (st && state.form) {
     const want = sizeInfo(state.form.page_size).tape;
     if (want && want !== st.tape_mm) {
       const suggest = st.tape_mm === 9 ? "Auto9" : "Auto";
-      out.push(banner("warn", "warn", `Băng đang lắp là ${st.tape_mm} mm, khổ mặc định dành cho băng ${want} mm`, "In bằng khổ này máy sẽ từ chối lệnh in.", state.form.page_sizes?.includes(suggest) ? { id: "fix-size", label: `Dùng khổ ${st.tape_mm} mm` } : null));
+      out.push(banner("warn", "warn", t("b.mismatch.t", { have: st.tape_mm, want }), t("b.mismatch.d"),
+        state.form.page_sizes?.includes(suggest) ? { id: "fix-size", label: t("b.mismatch.a", { have: st.tape_mm }) } : null));
     }
   }
   $("alerts").innerHTML = out.join("");
   for (const button of document.querySelectorAll("[data-act]")) {
     button.addEventListener("click", () => {
       if (button.dataset.act === "refresh") loadPrinter();
-      if (button.dataset.act === "fix-size") { state.form.page_size = state.printer.status.tape_mm === 9 ? "Auto9" : "Auto"; renderAll(); }
+      if (button.dataset.act === "fix-size") { state.form.page_size = state.printer.status.tape_mm === 9 ? "Auto9" : "Auto"; state.applied = false; renderAll(); }
     });
   }
 }
 
 function renderQuality() {
-  $("quality").innerHTML = `<legend class="sr" hidden>Chất lượng in</legend>` + QUALITIES.map((q) => `
-    <label class="choice"><input type="radio" name="quality" value="${q.key}" ${state.form.quality === q.key ? "checked" : ""} />
-      <span class="choice-text"><span class="choice-title">${q.title}<span class="choice-meta">${q.meta}</span></span><span class="choice-desc">${q.desc}</span></span></label>`).join("");
+  $("quality").innerHTML = QUALITY_KEYS.map((key) => `
+    <label class="choice"><input type="radio" name="quality" value="${key}" ${state.form.quality === key ? "checked" : ""} />
+      <span class="choice-text"><span class="choice-title">${t(`q.${key}.title`)}<span class="choice-meta">${t(`q.${key}.meta`)}</span></span><span class="choice-desc">${t(`q.${key}.desc`)}</span></span></label>`).join("");
   for (const input of document.querySelectorAll('input[name="quality"]')) {
-    input.addEventListener("change", () => { state.form.quality = input.value; renderBar(); });
+    input.addEventListener("change", () => { state.form.quality = input.value; state.applied = false; state.error = null; renderBar(); });
   }
 }
 
@@ -155,9 +158,9 @@ function renderSize() {
   const sizes = state.form.page_sizes?.length ? state.form.page_sizes : [state.form.page_size];
   const groups = new Map();
   for (const key of sizes) { const g = sizeInfo(key).group; groups.set(g, [...(groups.get(g) || []), key]); }
-  const list = [...groups].map(([name, items]) => `<div role="group" aria-label="${name}"><div class="select-group">${name}</div>${items.map((key) =>
+  const list = [...groups].map(([group, items]) => `<div role="group" aria-label="${t(group)}"><div class="select-group">${t(group)}</div>${items.map((key) =>
     `<button class="select-item" type="button" role="option" data-key="${key}" aria-selected="${key === state.form.page_size}"><span>${sizeText(key)}</span>${key === state.form.page_size ? icon("check") : ""}</button>`).join("")}</div>`).join("");
-  $("size").innerHTML = `<button class="select-btn" type="button" id="size-btn" aria-haspopup="listbox" aria-expanded="${openSelect}"><span>${sizeText(state.form.page_size)}</span>${icon("chevron")}</button><div class="select-list" role="listbox" id="size-list" ${openSelect ? "" : "hidden"}>${list}</div>`;
+  $("size").innerHTML = `<button class="select-btn" type="button" id="size-btn" aria-haspopup="listbox" aria-expanded="${openSelect}" aria-labelledby="h-size size-btn"><span>${sizeText(state.form.page_size)}</span>${icon("chevron")}</button><div class="select-list" role="listbox" aria-labelledby="h-size" id="size-list" ${openSelect ? "" : "hidden"}>${list}</div>`;
   $("size-btn").addEventListener("click", (event) => { event.stopPropagation(); openSelect = !openSelect; renderSize(); if (openSelect) $("size-list").querySelector('[aria-selected="true"]')?.scrollIntoView({ block: "nearest" }); });
   for (const item of document.querySelectorAll(".select-item")) {
     item.addEventListener("click", () => { state.form.page_size = item.dataset.key; state.applied = false; openSelect = false; renderAll(); });
@@ -166,15 +169,14 @@ function renderSize() {
 
 function renderBar() {
   const text = $("bar-text");
-  const apply = $("apply");
   const dirty = isDirty();
-  apply.disabled = !dirty || state.applying;
-  apply.toggleAttribute("aria-busy", state.applying);
+  $("apply").disabled = !dirty || state.applying;
+  $("apply").toggleAttribute("aria-busy", state.applying);
   $("reset").disabled = state.applying || !state.form || keys.every((k) => state.form[k] === DEFAULTS[k]);
   if (state.error) { text.dataset.tone = "bad"; text.textContent = state.error; }
-  else if (dirty) { text.dataset.tone = "dirty"; text.textContent = "Có thay đổi chưa áp dụng"; }
-  else if (state.applied) { text.dataset.tone = "ok"; text.textContent = "Đã áp dụng. Có tác dụng từ lần in tiếp theo, ở mọi ứng dụng."; }
-  else { text.dataset.tone = ""; text.textContent = state.saved ? "Đang dùng cài đặt này." : ""; }
+  else if (dirty) { text.dataset.tone = "dirty"; text.textContent = t("bar.dirty"); }
+  else if (state.applied) { text.dataset.tone = "ok"; text.textContent = t("bar.applied"); }
+  else { text.dataset.tone = ""; text.textContent = state.saved ? t("bar.using") : ""; }
 }
 
 function renderChecks() {
@@ -186,7 +188,7 @@ function renderAll() {
   const ready = !!state.form;
   $("form").hidden = !ready;
   $("bar").hidden = !ready;
-  $("conn").hidden = !!state.queueError;
+  $("conn").hidden = state.queueError;
   if (ready) { renderChecks(); renderQuality(); renderSize(); }
   renderStatus(); renderAlerts(); renderBar();
 }
@@ -205,9 +207,9 @@ async function loadSettings() {
     const settings = await call("get_settings");
     state.saved = settings;
     state.form = structuredClone(settings);
-    state.queueError = null;
-  } catch (error) {
-    state.queueError = String(error);
+    state.queueError = false;
+  } catch (_) {
+    state.queueError = true;
   }
   renderAll();
 }
@@ -219,7 +221,7 @@ async function apply() {
     state.saved = structuredClone(state.form);
     state.applied = true;
   } catch (error) {
-    state.error = `Không áp dụng được: ${error}`;
+    state.error = t("e.notApplied", { detail: errorText(error) });
   }
   state.applying = false; renderBar();
 }
@@ -228,23 +230,33 @@ async function saveHost() {
   const input = $("host");
   const button = $("save-host");
   input.removeAttribute("aria-invalid");
+  state.error = null;
   button.setAttribute("aria-busy", "true");
   try {
     await call("set_printer_host", { host: input.value });
     await loadPrinter();
   } catch (error) {
     input.setAttribute("aria-invalid", "true");
-    state.error = String(error); renderBar();
+    state.error = errorText(error);
   }
   button.removeAttribute("aria-busy");
+  renderBar();
+}
+
+function changeLanguage(next) {
+  if (next === lang) return;
+  setLang(next);
+  applyStaticText();
+  renderAll();
 }
 
 // ---------------------------------------------------------------- wiring
 paintStaticIcons();
+applyStaticText();
+for (const button of document.querySelectorAll("#lang button")) button.addEventListener("click", () => changeLanguage(button.dataset.lang));
 for (const id of ["half_cut", "full_cut", "mirror"]) {
   $(id).addEventListener("change", () => { state.form[id] = $(id).checked; state.applied = false; state.error = null; renderBar(); });
 }
-$("quality").addEventListener("change", () => { state.applied = false; state.error = null; });
 $("apply").addEventListener("click", apply);
 $("reset").addEventListener("click", () => { Object.assign(state.form, DEFAULTS); state.applied = false; renderAll(); });
 $("save-host").addEventListener("click", saveHost);

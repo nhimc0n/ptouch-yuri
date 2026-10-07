@@ -4,7 +4,7 @@ Print to a Brother PT-E850TKW from macOS without Brother's Windows software.
 This repository is a fork of https://github.com/vowstar/ptouch-rs (Rust CLI + egui GUI
 for P-touch printers). We add E850TKW support to it instead of writing a new stack.
 Owner: Yuri (Fiora Việt Nam). Talk to Yuri in Vietnamese; write code, comments,
-commit messages and docs in English. **UI strings shown to end users are Vietnamese.**
+commit messages and docs in English. **UI strings shown to end users are Vietnamese, and English in the settings app (switchable).**
 
 ## Scope
 
@@ -161,14 +161,21 @@ Built in `settings-app/` (not part of the main workspace so `cargo test --worksp
 no bundler, `withGlobalTauri`). Run it with `cd settings-app && cargo tauri dev`. Outside Tauri the UI runs on
 made-up data: serve `ui/` and open `index.html?m=ok|loi|dang-in|mat-ket-noi|chua-cai|tai` to see each state.
 
-UI decisions (taken by me under the skill's "dựng luôn" lane, Yuri can change any of them): one column in a
+**Design source (Yuri, 2026-10-07): the app UI follows the ui-ux-pro-max skill** (github.com/nextlevelbuilder/ui-ux-pro-max-skill,
+MIT; install with `/plugin marketplace add nextlevelbuilder/ui-ux-pro-max-skill` then
+`/plugin install ui-ux-pro-max@ui-ux-pro-max-skill`; its `scripts/search.py` is stdlib-only) instead of `evon:ui-ux`.
+The resulting system is written down in `settings-app/DESIGN.md`; follow that file, not the skill's landing-page pattern.
+Language: the app has a VI | EN switch (default Vietnamese). **Every user-facing string goes in `ui/i18n.js` in both
+languages**, never inline. Outfit (suggested by the skill) has no Vietnamese; use Work Sans.
+
+UI decisions (first built under the previous skill's "dựng luôn" lane, since restyled; Yuri can change any of them): one column in a
 ~720x800 window; status card first (state, address, loaded tape, refresh), then banners, then groups Cut /
 Mode / Quality / Default size / Connection; check boxes (not switches: switches apply instantly, these wait for
 **Áp dụng**) with a footer bar that says "Có thay đổi chưa áp dụng" and offers "Khôi phục mặc định"; quality as
 three choice cards; default size as a custom grouped select (no native `<select>`); follows the system
-light/dark setting; accent indigo like ResBoost (two places in `styles.css`: light and dark); system font
-(SF) because the app is macOS-only and SF has full Vietnamese; Vietnamese copy; flat, no shadows except the
-select popover. A warning banner appears when the loaded tape does not match the default size's tape.
+light/dark setting; navy accent from the ui-ux-pro-max palette (tokens in `styles.css`, light and dark measured
+separately); Work Sans declared with SF as the fallback until the font file is bundled; Vietnamese and English copy; flat,
+no shadows except the select popover; 44px controls. A warning banner appears when the loaded tape does not match the default size's tape.
 Chain is shown locked ("Chưa dùng được"). "In thử nhãn" and "Cài lại driver" are disabled placeholders
 ("Sắp có"): test print must go through `NetworkPrinter` (full pre-flight), driver install needs admin rights.
 
