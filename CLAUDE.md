@@ -174,7 +174,7 @@ Mode / Quality / Default size / Connection; check boxes (not switches: switches 
 **Áp dụng**) with a footer bar that says "Có thay đổi chưa áp dụng" and offers "Khôi phục mặc định"; quality as
 three choice cards; default size as a custom grouped select (no native `<select>`); follows the system
 light/dark setting; navy accent from the ui-ux-pro-max palette (tokens in `styles.css`, light and dark measured
-separately); Work Sans declared with SF as the fallback until the font file is bundled; Vietnamese and English copy; flat,
+separately); Work Sans bundled in `settings-app/ui/fonts/` (latin and vietnamese woff2 plus OFL.txt), SF as the fallback; Vietnamese and English copy; flat,
 no shadows except the select popover; 44px controls. A warning banner appears when the loaded tape does not match the default size's tape.
 Chain is shown locked ("Chưa dùng được"). "In thử nhãn" and "Cài lại driver" are disabled placeholders
 ("Sắp có"): test print must go through `NetworkPrinter` (full pre-flight), driver install needs admin rights.

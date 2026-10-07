@@ -25,8 +25,8 @@ better and control borders and focus at 3:1 or better, in **both** themes (check
 ## Type
 One sans-serif, **Work Sans** (Google Fonts, OFL). The skill also suggests Outfit, which has **no Vietnamese
 subset** (data/google-fonts.csv: latin, latin-ext only), so it must not be used here. Work Sans, Inter and
-Be Vietnam Pro do cover Vietnamese. Work Sans is not bundled yet; macOS falls back to SF, which also covers
-Vietnamese. When bundling, self-host the woff2 (the app must work offline). Body 15px / 1.5, rows 15px
+Be Vietnam Pro do cover Vietnamese. Work Sans is bundled in `ui/fonts/` (variable woff2, weight 400-700, latin and
+vietnamese subsets, licence in `ui/fonts/OFL.txt`) so the app works offline; SF is the fallback. Body 15px / 1.5, rows 15px
 medium, descriptions muted, nothing under 12px.
 
 ## Layout and controls
