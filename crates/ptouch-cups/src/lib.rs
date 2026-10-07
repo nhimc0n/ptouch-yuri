@@ -126,6 +126,33 @@ pub fn read_raster<R: Read>(mut input: R) -> Result<Vec<Page>> {
     }
 }
 
+impl Page {
+    /// Turn a portrait page (tape width across, length down) into the landscape
+    /// layout used everywhere else (length across, tape width down): the top of
+    /// the portrait page becomes the leading edge (left) and its left edge
+    /// becomes the bottom (highest pin), a quarter turn counterclockwise.
+    ///
+    /// UNVERIFIED(E850): which way up the printed text appears for portrait
+    /// documents needs a test print.
+    pub fn rotated_to_landscape(&self) -> Page {
+        let (w, h) = (self.width as usize, self.height as usize);
+        let mut pixels = vec![255u8; w * h];
+        // new page: width h (feed), height w (across); new(xl, yl) = old(w-1-yl, xl)
+        for yl in 0..w {
+            for xl in 0..h {
+                pixels[yl * h + xl] = self.pixels[xl * w + (w - 1 - yl)];
+            }
+        }
+        Page {
+            width: self.height,
+            height: self.width,
+            dpi_x: self.dpi_y,
+            dpi_y: self.dpi_x,
+            pixels,
+        }
+    }
+}
+
 /// Tape width in millimetres that a page of this height (in dots at 360 dpi)
 /// is meant for, within a few dots of tolerance.
 ///
@@ -209,6 +236,18 @@ impl Label {
 /// The page height must match a supported tape; the printable band is cut from
 /// the middle of the page (the PPD leaves the unprintable edge as margin).
 pub fn page_to_label(page: &Page) -> Result<Label> {
+    // Documents come in two conventions: landscape (length x tape width) and
+    // portrait (tape width x length, what most label PDFs use). Normalise to
+    // landscape first.
+    let rotated;
+    let page = if tape_width_mm_for_height(page.height).is_none()
+        && tape_width_mm_for_height(page.width).is_some()
+    {
+        rotated = page.rotated_to_landscape();
+        &rotated
+    } else {
+        page
+    };
     if page.dpi_x != DPI || page.dpi_y != DPI {
         return Err(format!(
             "page resolution is {}x{} dpi; the PT-E850TKW needs {DPI}x{DPI}",
@@ -217,8 +256,8 @@ pub fn page_to_label(page: &Page) -> Result<Label> {
     }
     let tape_mm = tape_width_mm_for_height(page.height).ok_or_else(|| {
         format!(
-            "page height {} dots does not match a supported tape width (36 mm is 454 or 510 dots)",
-            page.height
+            "the page is {}x{} dots; one side must be the tape width (36 mm = 454 or 510 dots)",
+            page.width, page.height
         )
     })?;
     if page.width < MIN_LENGTH_DOTS {
@@ -305,7 +344,7 @@ pub fn parse_options(text: &str) -> Options {
             ("cutmode", "full") => options.cut = CutMode::Full,
             ("cutmode", "half") => options.cut = CutMode::Half,
             ("copies", n) => options.copies = n.parse().unwrap_or(1).max(1),
-            ("pagesize", "auto") => options.auto_length = true,
+            ("pagesize", "auto" | "autop") => options.auto_length = true,
             _ => {}
         }
     }
@@ -424,6 +463,36 @@ mod tests {
     }
 
     #[test]
+    fn portrait_pages_are_rotated_a_quarter_turn_counterclockwise() {
+        // 36 mm wide (454 band) x 600 long portrait page, ink at its top-left corner
+        let portrait = page(454, 600, |x, y| if x == 0 && y == 0 { 0 } else { 255 });
+        let landscape = portrait.rotated_to_landscape();
+        assert_eq!((landscape.width, landscape.height), (600, 454));
+        // top of the portrait page -> leading edge (x = 0); its left edge -> bottom row
+        assert_eq!(landscape.pixels[453 * 600], 0);
+        assert_eq!(landscape.pixels.iter().filter(|p| **p == 0).count(), 1);
+        // bottom-right corner -> top-right
+        let br = page(454, 600, |x, y| if x == 453 && y == 599 { 0 } else { 255 })
+            .rotated_to_landscape();
+        assert_eq!(br.pixels[599], 0);
+    }
+
+    #[test]
+    fn a_portrait_label_page_prints_like_its_landscape_twin() {
+        let portrait = page(454, 600, |x, y| if y < 100 && x > 200 { 0 } else { 255 });
+        let label = page_to_label(&portrait).unwrap();
+        assert_eq!((label.tape_mm, label.lines.len()), (36, 600));
+        let twin = page_to_label(&portrait.rotated_to_landscape()).unwrap();
+        assert_eq!(label, twin);
+        // a page with no side matching a tape width is still refused
+        assert!(
+            page_to_label(&page(300, 700, |_, _| 0))
+                .unwrap_err()
+                .contains("tape width")
+        );
+    }
+
+    #[test]
     fn band_sized_page_needs_no_cropping() {
         let label = page_to_label(&page(100, 454, |_, _| 0)).unwrap();
         assert_eq!(label.tape_mm, 36);
@@ -472,7 +541,7 @@ mod tests {
         assert!(
             page_to_label(&page(100, 300, |_, _| 255))
                 .unwrap_err()
-                .contains("supported tape")
+                .contains("tape width")
         );
         assert!(
             page_to_label(&page(20, 510, |_, _| 255))
@@ -546,6 +615,7 @@ mod tests {
     #[test]
     fn auto_page_size_is_detected_from_the_options() {
         assert!(parse_options("PageSize=Auto CutMode=Half").auto_length);
+        assert!(parse_options("PageSize=AutoP").auto_length);
         assert!(!parse_options("PageSize=L100").auto_length);
         assert!(!parse_options("PageSize=Custom.425x102").auto_length);
     }
