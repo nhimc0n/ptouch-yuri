@@ -226,15 +226,20 @@ After reinstalling the queue, quit and reopen any app whose print dialog should 
 Printing works end to end on TZe 36 mm from the CLI and from the macOS print queue (browser,
 `lp`): correct orientation, position and length, half cut, High quality and High resolution all
 printed. TZe 9 mm geometry is verified by capture but nothing has been printed on it yet.
-The installed queue has the check-box options (`HalfCut`, `FullCut`, `Chain`, `LabelQuality`),
-but the filter still only reads job options, not the queue defaults.
+**Settings app phase 1 is coded** (not yet installed or printed): the filter resolves options as
+job option > queue default from `$PPD` > built-in (`resolve_options`, `defaults_from_ppd` in
+`ptouch-cups`), and the PPD has `MirrorPrint`. Checked through `cupsfilter` with a PPD copy whose
+defaults were changed: Full cut + Mirror + HiRes applied with an empty job option string, a job
+option overrode one of them, and a job that names no page size is trimmed because the default is
+`Auto`. Still to do for phase 1: reinstall, change a default with `lpadmin` on the real queue and
+print once to confirm the sandboxed filter really reads `$PPD`.
 
 **Printer state:** 9 mm tape is loaded and the printer has reported ERROR since a mismatched
 36 mm test job; Yuri says the panel is clear but web/SNMP still say ERROR. Do not print until
 `ptouch info --host` says Idle.
 
 **Open items:**
-- Settings app: phase 1 not started (this plan was written first).
+- Settings app: phase 1 needs the on-printer check above; phase 2 (queue access module) is next.
 - Chain printing: needs captures from P-touch Editor of (a) three labels with chain print on
   and (b) one label with chain print on.
 - Full cut and No cut: never printed.
