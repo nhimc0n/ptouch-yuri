@@ -139,7 +139,8 @@ the 454-dot band (macOS then emits exactly the band). macOS (`cgpdftoraster`) re
 builds the job, CUPS' built-in `lpd` backend delivers it to `lpd://<ip>/BINARY_P1`. One label per job
 (pages > 1 or copies > 1 are refused). Page size `Auto` (default, 400 mm page) trims blank
 lines at both ends (2 mm kept) so the label is as long as its content; fixed sizes and `Custom` (15-1000 mm
-long x 36 mm) print the page length exactly. The printer adds ~1 mm feed margin per end (a 50 mm page prints 52 mm). Dry run without a printer:
+long x 36 mm) print the page length exactly. The printer adds a 14 dot (~1 mm) feed margin at each end (measured: 50 mm page -> 52 mm, 80 mm -> 82 mm),
+so for fixed/custom sizes the filter drops 14 lines from each end of the page and the label is exactly the chosen length. Dry run without a printer:
 `cupsfilter -p data/cups/PT-E850TKW.ppd -m application/vnd.cups-raster in.pdf > in.ras` then
 `rastertoptouch --dry-run in.ras out.bin`. Install/reinstall with `scripts/install-cups-macos.sh <ip>` (sudo).
 
