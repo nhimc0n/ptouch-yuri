@@ -1,0 +1,17 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+[package]
+name = "ptouch-settings"
+description = "Driver settings for the Brother PT-E850TKW print queue on macOS"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license = "GPL-3.0-or-later"
+repository.workspace = true
+
+[lib]
+name = "ptouch_settings"
+path = "src/lib.rs"
+
+[dependencies]
+ptouch-core = { path = "../ptouch-core" }

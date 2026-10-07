@@ -3153,6 +3153,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "ptouch-settings"
+version = "0.8.5"
+dependencies = [
+ "ptouch-core",
+]
+
+[[package]]
 name = "pulp"
 version = "0.22.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
