@@ -139,8 +139,9 @@
 
 *OpenGroup: Label/Label Options
 *% Check boxes, so the modes can be combined. Half cut wins if both cuts are ticked,
-*% neither ticked means no cut. Mirror printing is the standard "Flip horizontally"
-*% box in the Layout section of the print dialog, which macOS applies by itself.
+*% neither ticked means no cut. These are the DRIVER SETTINGS: the settings app changes
+*% their defaults with lpadmin and the filter reads them from this file ($PPD). The
+*% standard "Flip horizontally" box also mirrors (macOS flips the page itself).
 *OpenUI *HalfCut/Half cut (cut the label, keep the backing paper): Boolean
 *OrderDependency: 30 AnySetup *HalfCut
 *DefaultHalfCut: True
@@ -161,6 +162,13 @@
 *Chain True/Chain printing: "<<>>setpagedevice"
 *Chain False/Off: "<<>>setpagedevice"
 *CloseUI: *Chain
+
+*OpenUI *MirrorPrint/Mirror print (to read through a clear label): Boolean
+*OrderDependency: 33 AnySetup *MirrorPrint
+*DefaultMirrorPrint: False
+*MirrorPrint True/Mirror print: "<<>>setpagedevice"
+*MirrorPrint False/Off: "<<>>setpagedevice"
+*CloseUI: *MirrorPrint
 *CloseGroup: Label
 
 *OpenGroup: Quality/Print Quality
