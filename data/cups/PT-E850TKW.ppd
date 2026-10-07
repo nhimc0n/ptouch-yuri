@@ -111,6 +111,14 @@
 *Resolution 360dpi/Standard 360 x 360 dpi: "<</HWResolution[360 360]>>setpagedevice"
 *CloseUI: *Resolution
 
+*OpenUI *LabelQuality/Print Quality: PickOne
+*OrderDependency: 25 AnySetup *LabelQuality
+*DefaultLabelQuality: Normal
+*LabelQuality Normal/Normal (360 x 360 dpi): "<</HWResolution[360 360]>>setpagedevice"
+*LabelQuality High/High quality (slower, same resolution): "<</HWResolution[360 360]>>setpagedevice"
+*LabelQuality HiRes/High resolution (360 x 720 dpi, slowest): "<</HWResolution[720 720]>>setpagedevice"
+*CloseUI: *LabelQuality
+
 *OpenUI *ColorModel/Color Mode: PickOne
 *OrderDependency: 10 AnySetup *ColorModel
 *DefaultColorModel: Gray

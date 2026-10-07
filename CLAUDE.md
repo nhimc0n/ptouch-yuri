@@ -144,7 +144,10 @@ so for fixed/custom sizes the filter drops 14 lines from each end of the page an
 **Portrait documents** (page width = 36 mm, height = length, the usual label-PDF layout, e.g. Yuri's `1400000068.pdf`
 36x75 mm) are supported next to landscape ones: the filter rotates a portrait page a quarter turn
 counterclockwise (page top = leading edge). PPD has portrait sizes `P50..P200`, `AutoP`, and custom sizes where
-either side may be 36 mm. UNVERIFIED(E850): which way up the printed text appears for portrait pages. Dry run without a printer:
+either side may be 36 mm. UNVERIFIED(E850): which way up the printed text appears for portrait pages.
+**Print Quality** option in the dialog (`LabelQuality`): Normal (360x360), High quality (flag 0xC4, slower, same raster),
+High resolution (360x720: macOS renders at 720 dpi, the filter halves the cross axis, `ESC i z` type 09, K bit 6, margin 28;
+max label 500 mm at 720 dpi, laminated TZe only). All header bytes are verified against Brother captures. Dry run without a printer:
 `cupsfilter -p data/cups/PT-E850TKW.ppd -m application/vnd.cups-raster in.pdf > in.ras` then
 `rastertoptouch --dry-run in.ras out.bin`. Install/reinstall with `scripts/install-cups-macos.sh <ip>` (sudo).
 
