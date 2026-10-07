@@ -124,8 +124,8 @@ static TAPE_TABLE_360: &[TapeInfo] = &[
 /// centred on the head, so a renderer must place it at `left_pins`, the number
 /// of leading zero pins in raster-line byte order.
 ///
-/// E850-verified for TZe 36 mm: P-touch Editor inks pins 61..=514 (captures 2
-/// and 3, 2026-10-06). That is the *right* margin column of the PT-P900
+/// E850-verified for TZe 36 mm (P-touch Editor inks pins 61..=514, captures 2
+/// and 3) and TZe 9 mm (pins 235..=340, capture cap_9mm_new, 2026-10-07). That is the *right* margin column of the PT-P900
 /// reference table (45 left / 61 right), so every row below is that table
 /// flipped; the other widths are assumed to flip the same way.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -140,8 +140,9 @@ pub struct HeadBand {
 pub const HEAD_560_PINS: u16 = 560;
 
 // Head geometry from the PT-P900 raster command reference v1.02, section 2.3.5
-// (raster-protocol.md section 7), flipped to byte order. Only the 36 mm row is
-// E850-verified; UNVERIFIED(E850) for the others. Keyed by the status width code.
+// (raster-protocol.md section 7), flipped to byte order. The TZe 36 mm and 9 mm
+// rows are E850-verified (captures cap2/cap3 and cap_9mm_new); UNVERIFIED(E850)
+// for the others. Keyed by the status width code.
 const BANDS_TZE_560: &[(u8, HeadBand)] = &[
     (
         4,

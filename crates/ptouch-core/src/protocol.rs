@@ -382,6 +382,10 @@ pub struct JobOptions {
     /// "Give priority to print quality": slower printing at the same raster
     /// (`P900_RASTER` models only).
     pub quality_priority: bool,
+    /// Do not cut at all (`P900_RASTER` models only): `ESC i M 00`, no
+    /// `ESC i A`, and no cut-at-end bit in `ESC i K`, the bytes P-touch Editor
+    /// sent in the quality captures. The tape is fed out for tearing off.
+    pub no_cut: bool,
 }
 
 /// Append raster lines (blank ones as `Z`), each repeated `repeat` times.
@@ -466,9 +470,12 @@ pub fn build_print_job(lines: &[Vec<u8>], flags: DeviceFlags, opts: &JobOptions)
             opts.quality_priority,
             high_res,
         ));
-        if opts.precut {
+        if opts.precut && !opts.no_cut {
             job.push(cmd_precut(true));
             job.push(cmd_cut_every(1));
+        } else {
+            // Editor sends an explicit "auto cut off" when it does not cut.
+            job.push(cmd_precut(false));
         }
         job.push(cmd_advanced_mode(
             if high_res {
@@ -477,7 +484,7 @@ pub fn build_print_job(lines: &[Vec<u8>], flags: DeviceFlags, opts: &JobOptions)
                 PrintQuality::Standard
             },
             false,
-            !opts.chain_print,
+            !opts.chain_print && !opts.no_cut,
             opts.half_cut,
         ));
         job.push(cmd_esc_i_k_lower());
@@ -973,6 +980,39 @@ mod tests {
             "header differs from the Brother capture"
         );
         assert_eq!(*job.last().unwrap(), *FIXTURE.last().unwrap()); // 0x1A
+    }
+
+    #[test]
+    fn test_job_p900_no_cut_matches_the_capture_bytes() {
+        // quality captures: ESC i M 00, no ESC i A, ESC i K 04, ESC i d 14
+        let job: &[u8] = include_bytes!("../../../fixtures/jobs/cap_highquarity.bin");
+        let opts = JobOptions {
+            media_width: 36,
+            media_type: 0x01,
+            no_cut: true,
+            half_cut: true,
+            precut: true,
+            ..JobOptions::default()
+        };
+        let ours = flat(&build_print_job(
+            &vec![line_70(1); 323],
+            e850_flags(),
+            &opts,
+        ));
+        assert!(
+            ours.windows(4)
+                .any(|w| w == captured(job, 0x4D, 1).as_slice())
+        );
+        assert!(
+            !ours.windows(3).any(|w| w == [0x1B, 0x69, 0x41]),
+            "no ESC i A"
+        );
+        assert!(
+            ours.windows(4)
+                .any(|w| w == captured(job, 0x4B, 1).as_slice())
+        );
+        assert_eq!(captured(job, 0x4B, 1), [0x1B, 0x69, 0x4B, 0x04]);
+        assert_eq!(*ours.last().unwrap(), 0x1A);
     }
 
     #[test]
