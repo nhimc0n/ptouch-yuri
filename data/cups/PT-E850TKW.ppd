@@ -138,20 +138,29 @@
 *CloseGroup: General
 
 *OpenGroup: Label/Label Options
-*OpenUI *CutMode/Cut Mode: PickOne
-*OrderDependency: 30 AnySetup *CutMode
-*DefaultCutMode: Half
-*CutMode Half/Half cut - cut the label, keep the backing paper: "<<>>setpagedevice"
-*CutMode Full/Full cut - cut through the label and the backing paper: "<<>>setpagedevice"
-*CutMode None/No cut - feed the tape out and tear it off by hand: "<<>>setpagedevice"
-*CloseUI: *CutMode
+*% Check boxes, so the modes can be combined. Half cut wins if both cuts are ticked,
+*% neither ticked means no cut. Mirror printing is the standard "Flip horizontally"
+*% box in the Layout section of the print dialog, which macOS applies by itself.
+*OpenUI *HalfCut/Half cut (cut the label, keep the backing paper): Boolean
+*OrderDependency: 30 AnySetup *HalfCut
+*DefaultHalfCut: True
+*HalfCut True/Half cut: "<<>>setpagedevice"
+*HalfCut False/Off: "<<>>setpagedevice"
+*CloseUI: *HalfCut
 
-*OpenUI *Mirror/Mirror Print: PickOne
-*OrderDependency: 31 AnySetup *Mirror
-*DefaultMirror: Off
-*Mirror Off/Off - normal print: "<<>>setpagedevice"
-*Mirror On/On - mirror image, to read through a clear label: "<<>>setpagedevice"
-*CloseUI: *Mirror
+*OpenUI *FullCut/Full cut (cut through the label and the backing paper): Boolean
+*OrderDependency: 31 AnySetup *FullCut
+*DefaultFullCut: False
+*FullCut True/Full cut: "<<>>setpagedevice"
+*FullCut False/Off: "<<>>setpagedevice"
+*CloseUI: *FullCut
+
+*OpenUI *Chain/Chain printing (no feed or cut at the end, for continuous labels): Boolean
+*OrderDependency: 32 AnySetup *Chain
+*DefaultChain: False
+*Chain True/Chain printing: "<<>>setpagedevice"
+*Chain False/Off: "<<>>setpagedevice"
+*CloseUI: *Chain
 *CloseGroup: Label
 
 *OpenGroup: Quality/Print Quality
