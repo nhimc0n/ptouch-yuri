@@ -39,7 +39,7 @@ crates/
   ptouch-cli/       `ptouch` binary (`--host` = network, full pre-flight)            MIT
   ptouch-gui/       upstream egui label editor (not E850-aware yet)                  MIT
   ptouch-cups/      `rastertoptouch` CUPS filter: print queue -> label job           GPL-3.0+
-  ptouch-settings/  (planned) Tauri 2 settings app for the driver                    GPL-3.0+
+  ptouch-settings/  driver settings: queue + status library now, Tauri 2 app next    GPL-3.0+
 data/cups/          PT-E850TKW.ppd (label sizes + driver options)
 scripts/            install-cups-macos.sh (queue + filter, sudo) and upstream scripts
 fixtures/
@@ -239,7 +239,10 @@ print once to confirm the sandboxed filter really reads `$PPD`.
 `ptouch info --host` says Idle.
 
 **Open items:**
-- Settings app: phase 1 needs the on-printer check above; phase 2 (queue access module) is next.
+- Settings app: phase 1 needs the on-printer check above. Phase 2 is coded in `crates/ptouch-settings`
+  (`queue`: read/apply the queue defaults and the printer address through `lpoptions`/`lpstat`/`lpadmin`;
+  `status`: live state through `ptouch-core`; `cargo run -p ptouch-settings --example show` reads both from
+  the real queue). Not done in phase 2: finding the printer by Bonjour. Next: phase 3, UI design with `evon:ui-ux`.
 - Chain printing: needs captures from P-touch Editor of (a) three labels with chain print on
   and (b) one label with chain print on.
 - Full cut and No cut: never printed.
