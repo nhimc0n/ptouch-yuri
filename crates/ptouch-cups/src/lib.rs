@@ -127,6 +127,29 @@ pub fn read_raster<R: Read>(mut input: R) -> Result<Vec<Page>> {
 }
 
 impl Page {
+    /// Halve the number of rows (the axis across the tape) of a landscape page
+    /// rendered at 720 dpi: the head has 360 dpi across, only the feed is finer.
+    /// Each output pixel is the average of two input rows, so a one-dot line at
+    /// 720 dpi still counts as ink.
+    pub fn halved_across(&self) -> Page {
+        let (w, h) = (self.width as usize, (self.height / 2) as usize);
+        let mut pixels = Vec::with_capacity(w * h);
+        for y in 0..h {
+            for x in 0..w {
+                let a = u16::from(self.pixels[(2 * y) * w + x]);
+                let b = u16::from(self.pixels[(2 * y + 1) * w + x]);
+                pixels.push(((a + b) / 2) as u8);
+            }
+        }
+        Page {
+            width: self.width,
+            height: h as u32,
+            dpi_x: self.dpi_x,
+            dpi_y: self.dpi_y / 2,
+            pixels,
+        }
+    }
+
     /// Turn a portrait page (tape width across, length down) into the landscape
     /// layout used everywhere else (length across, tape width down): the top of
     /// the portrait page becomes the leading edge (left) and its left edge
@@ -176,6 +199,16 @@ pub struct Label {
     pub tape_mm: u8,
     /// 70-byte raster lines, one per dot along the feed.
     pub lines: Vec<Vec<u8>>,
+    /// Dots per inch along the feed: 360, or 720 for high resolution.
+    pub feed_dpi: u32,
+}
+
+impl Label {
+    /// Factor between this label's feed dots and the 360 dpi values used for
+    /// minimum lengths and margins.
+    pub fn scale(&self) -> usize {
+        (self.feed_dpi / DPI).max(1) as usize
+    }
 }
 
 /// Blank margin kept before and after the content in automatic length mode,
@@ -198,7 +231,8 @@ impl Label {
         let end = (last + 1 + trail).min(self.lines.len());
         self.lines = self.lines[start..end].to_vec();
         let blank = vec![0u8; self.lines[0].len()];
-        while self.lines.len() < MIN_LENGTH_DOTS as usize {
+        let minimum = MIN_LENGTH_DOTS as usize * self.scale();
+        while self.lines.len() < minimum {
             self.lines.push(blank.clone());
         }
         Ok(())
@@ -219,8 +253,12 @@ impl Label {
     /// UNVERIFIED(E850): that the two margins are one at each end; the total
     /// (+2 mm) is measured, their split is not.
     pub fn compensate_feed_margin(&mut self) -> Result<()> {
-        let spare = self.lines.len().saturating_sub(MIN_LENGTH_DOTS as usize);
-        let crop = (2 * FEED_MARGIN_DOTS).min(spare);
+        let scale = self.scale();
+        let spare = self
+            .lines
+            .len()
+            .saturating_sub(MIN_LENGTH_DOTS as usize * scale);
+        let crop = (2 * FEED_MARGIN_DOTS * scale).min(spare);
         let front = crop / 2;
         let end = self.lines.len() - (crop - front);
         self.lines = self.lines[front..end].to_vec();
@@ -236,34 +274,49 @@ impl Label {
 /// The page height must match a supported tape; the printable band is cut from
 /// the middle of the page (the PPD leaves the unprintable edge as margin).
 pub fn page_to_label(page: &Page) -> Result<Label> {
+    // 360 x 360 dpi, or 720 x 720 for high resolution (the head is 360 dpi
+    // across the tape, so the cross axis is halved below; the feed stays 720).
+    let scale = match (page.dpi_x, page.dpi_y) {
+        (DPI, DPI) => 1,
+        (720, 720) => 2,
+        (x, y) => {
+            return Err(format!(
+                "page resolution is {x}x{y} dpi; the PT-E850TKW needs {DPI}x{DPI} or 720x720"
+            ));
+        }
+    };
     // Documents come in two conventions: landscape (length x tape width) and
     // portrait (tape width x length, what most label PDFs use). Normalise to
     // landscape first.
     let rotated;
-    let page = if tape_width_mm_for_height(page.height).is_none()
-        && tape_width_mm_for_height(page.width).is_some()
+    let page = if tape_width_mm_for_height(page.height / scale).is_none()
+        && tape_width_mm_for_height(page.width / scale).is_some()
     {
         rotated = page.rotated_to_landscape();
         &rotated
     } else {
         page
     };
-    if page.dpi_x != DPI || page.dpi_y != DPI {
-        return Err(format!(
-            "page resolution is {}x{} dpi; the PT-E850TKW needs {DPI}x{DPI}",
-            page.dpi_x, page.dpi_y
-        ));
-    }
+    let halved;
+    let page = if scale == 2 {
+        halved = page.halved_across();
+        &halved
+    } else {
+        page
+    };
     let tape_mm = tape_width_mm_for_height(page.height).ok_or_else(|| {
         format!(
             "the page is {}x{} dots; one side must be the tape width (36 mm = 454 or 510 dots)",
             page.width, page.height
         )
     })?;
-    if page.width < MIN_LENGTH_DOTS {
+    // At 720 dpi a label has twice the lines for the same length, but the
+    // printer's line limit is unchanged (UNVERIFIED(E850)), so it is shorter.
+    if page.width < MIN_LENGTH_DOTS * scale as u32 {
         return Err(format!(
-            "label is too short: {} dots, minimum {MIN_LENGTH_DOTS}",
-            page.width
+            "label is too short: {} dots, minimum {}",
+            page.width,
+            MIN_LENGTH_DOTS * scale as u32
         ));
     }
     if page.width > MAX_LENGTH_DOTS {
@@ -294,11 +347,15 @@ pub fn page_to_label(page: &Page) -> Result<Label> {
     if lines.iter().all(|line| line.iter().all(|b| *b == 0)) {
         return Err(
             "the label is blank: nothing falls inside the printable area. Check that the \
-             paper size is the label size (length x 36 mm, landscape) and the margins are None"
+             paper size is the label size (36 mm on one side) and the content is not outside it"
                 .into(),
         );
     }
-    Ok(Label { tape_mm, lines })
+    Ok(Label {
+        tape_mm,
+        lines,
+        feed_dpi: DPI * scale as u32,
+    })
 }
 
 /// Cut behaviour chosen in the print dialog.
@@ -308,6 +365,17 @@ pub enum CutMode {
     Full,
     /// Cut the label but keep the backing (E850-verified).
     Half,
+}
+
+/// Print quality chosen in the print dialog.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Quality {
+    /// 360 x 360 dpi (E850-verified).
+    Normal,
+    /// "Give priority to print quality": slower, same raster (E850-verified).
+    High,
+    /// 360 x 720 dpi: slowest, finest along the feed (E850-verified on TZe).
+    HiRes,
 }
 
 /// Print options from the CUPS command line.
@@ -320,6 +388,8 @@ pub struct Options {
     /// Size the label to its content instead of the page length
     /// (page size "Auto").
     pub auto_length: bool,
+    /// Print quality.
+    pub quality: Quality,
 }
 
 impl Default for Options {
@@ -328,6 +398,7 @@ impl Default for Options {
             cut: CutMode::Half,
             copies: 1,
             auto_length: false,
+            quality: Quality::Normal,
         }
     }
 }
@@ -345,6 +416,9 @@ pub fn parse_options(text: &str) -> Options {
             ("cutmode", "half") => options.cut = CutMode::Half,
             ("copies", n) => options.copies = n.parse().unwrap_or(1).max(1),
             ("pagesize", "auto" | "autop") => options.auto_length = true,
+            ("labelquality", "normal") => options.quality = Quality::Normal,
+            ("labelquality", "high") => options.quality = Quality::High,
+            ("labelquality", "hires") => options.quality = Quality::HiRes,
             _ => {}
         }
     }
@@ -364,13 +438,27 @@ pub fn build_job_offline(
 ) -> Result<Vec<u8>> {
     let info =
         device::find_device_by_name("PT-E850TKW").ok_or("PT-E850TKW is not in the device table")?;
+    let hi_res = options.quality == Quality::HiRes;
+    if hi_res != (label.feed_dpi == 720) {
+        return Err(if hi_res {
+            "High resolution was selected but the page was not rendered at 720 dpi".into()
+        } else {
+            "the page was rendered at 720 dpi but High resolution is not selected".into()
+        });
+    }
     let job_options = ptouch_core::protocol::JobOptions {
         media_width: label.tape_mm,
         media_type: 0x01,
         precut: true,
         half_cut: options.cut == CutMode::Half,
-        margin_dots: ptouch_core::protocol::MIN_MARGIN_DOTS,
+        margin_dots: ptouch_core::protocol::MIN_MARGIN_DOTS * label.scale() as u16,
         job_number,
+        quality: if hi_res {
+            ptouch_core::PrintQuality::HighRes
+        } else {
+            ptouch_core::PrintQuality::Standard
+        },
+        quality_priority: options.quality == Quality::High,
         ..Default::default()
     };
     let chunks = ptouch_core::protocol::build_print_job(&label.lines, info.flags, &job_options);
@@ -408,6 +496,12 @@ mod tests {
             }
         }
         out
+    }
+
+    fn page_dpi(width: u32, height: u32, dpi: u32, fill: impl Fn(u32, u32) -> u8) -> Page {
+        read_raster(&raster_bytes(width, height, dpi, fill)[..])
+            .unwrap()
+            .remove(0)
     }
 
     fn page(width: u32, height: u32, fill: impl Fn(u32, u32) -> u8) -> Page {
@@ -558,7 +652,11 @@ mod tests {
         for &i in ink {
             lines[i][8] = 0x10;
         }
-        Label { tape_mm: 36, lines }
+        Label {
+            tape_mm: 36,
+            lines,
+            feed_dpi: 360,
+        }
     }
 
     #[test]
@@ -610,6 +708,98 @@ mod tests {
                 .unwrap_err()
                 .contains("blank")
         );
+    }
+
+    #[test]
+    fn a_720_dpi_page_keeps_the_feed_resolution_and_halves_the_cross_axis() {
+        // 80 mm x 36 mm band at 720 dpi: 2268 x 908 dots
+        let label = page_to_label(&page_dpi(
+            2268,
+            908,
+            720,
+            |x, _| if x < 400 { 0 } else { 255 },
+        ))
+        .unwrap();
+        assert_eq!(
+            (label.tape_mm, label.feed_dpi, label.lines.len()),
+            (36, 720, 2268)
+        );
+        let pins: Vec<usize> = (0..560)
+            .filter(|p| label.lines[0][p / 8] & (0x80 >> (p % 8)) != 0)
+            .collect();
+        assert_eq!((pins[0], *pins.last().unwrap(), pins.len()), (61, 514, 454));
+        // portrait pages work at 720 dpi too
+        let portrait = page_dpi(908, 2268, 720, |_, y| if y < 400 { 0 } else { 255 });
+        assert_eq!(page_to_label(&portrait).unwrap().lines.len(), 2268);
+    }
+
+    #[test]
+    fn halving_keeps_one_dot_lines_visible() {
+        let thin = page_dpi(100, 908, 720, |_, y| if y == 301 { 0 } else { 255 });
+        let halved = thin.halved_across();
+        assert_eq!(halved.height, 454);
+        assert!(halved.pixels[150 * 100] < 128, "a 1 dot line must stay ink");
+    }
+
+    #[test]
+    fn hi_res_scales_the_minimum_length_and_margins() {
+        let mut label = page_to_label(&page_dpi(
+            2268,
+            908,
+            720,
+            |x, _| if x == 700 { 0 } else { 255 },
+        ))
+        .unwrap();
+        label.compensate_feed_margin().unwrap();
+        assert_eq!(label.lines.len(), 2268 - 2 * 2 * FEED_MARGIN_DOTS);
+        let mut tiny = page_to_label(&page_dpi(
+            300,
+            908,
+            720,
+            |x, _| if x == 100 { 0 } else { 255 },
+        ))
+        .unwrap();
+        tiny.trim_to_content(56, 56).unwrap();
+        assert!(tiny.lines.len() >= 2 * MIN_LENGTH_DOTS as usize);
+    }
+
+    #[test]
+    fn quality_options_and_the_job_headers_they_produce() {
+        assert_eq!(parse_options("LabelQuality=HiRes").quality, Quality::HiRes);
+        assert_eq!(parse_options("LabelQuality=High").quality, Quality::High);
+        assert_eq!(parse_options("").quality, Quality::Normal);
+
+        let normal = page_to_label(&page(400, 454, |x, _| if x < 50 { 0 } else { 255 })).unwrap();
+        let high = Options {
+            quality: Quality::High,
+            ..Options::default()
+        };
+        let job = build_job_offline(&normal, &high, None).unwrap();
+        assert!(
+            job.windows(5).any(|w| w == [0x7A, 0xC4, 0x00, 36, 0]),
+            "priority flag 0xC4"
+        );
+
+        let fine = page_to_label(&page_dpi(
+            800,
+            908,
+            720,
+            |x, _| if x < 100 { 0 } else { 255 },
+        ))
+        .unwrap();
+        let hires = Options {
+            quality: Quality::HiRes,
+            ..Options::default()
+        };
+        let job = build_job_offline(&fine, &hires, None).unwrap();
+        assert!(
+            job.windows(6).any(|w| w == [0x7A, 0x86, 0x09, 36, 0, 0x20]),
+            "type 09, 800 lines"
+        );
+        assert!(job.windows(5).any(|w| w == [0x1B, 0x69, 0x64, 28, 0]));
+        // option and page resolution must agree
+        assert!(build_job_offline(&fine, &Options::default(), None).is_err());
+        assert!(build_job_offline(&normal, &hires, None).is_err());
     }
 
     #[test]
