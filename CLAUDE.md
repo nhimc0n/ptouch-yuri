@@ -39,7 +39,8 @@ crates/
   ptouch-cli/       `ptouch` binary (`--host` = network, full pre-flight)            MIT
   ptouch-gui/       upstream egui label editor (not E850-aware yet)                  MIT
   ptouch-cups/      `rastertoptouch` CUPS filter: print queue -> label job           GPL-3.0+
-  ptouch-settings/  driver settings: queue + status library now, Tauri 2 app next    GPL-3.0+
+  ptouch-settings/  driver settings library: queue defaults + printer status          GPL-3.0+
+settings-app/       Tauri 2 settings app (own Cargo workspace, ui/ = vanilla JS)      GPL-3.0+
 data/cups/          PT-E850TKW.ppd (label sizes + driver options)
 scripts/            install-cups-macos.sh (queue + filter, sudo) and upstream scripts
 fixtures/
@@ -153,6 +154,27 @@ Rules for the app code:
 - No new front-end framework or bundler. No `unwrap()` outside tests.
 - The app must not print except through `test_print`, which keeps the pre-flight.
 
+### Settings app: state (phases 3 and 4 started)
+
+Built in `settings-app/` (not part of the main workspace so `cargo test --workspace` stays fast):
+`src-tauri/` (Tauri 2, four `command(async)` commands over `ptouch-settings`) and `ui/` (vanilla HTML/CSS/JS,
+no bundler, `withGlobalTauri`). Run it with `cd settings-app && cargo tauri dev`. Outside Tauri the UI runs on
+made-up data: serve `ui/` and open `index.html?m=ok|loi|dang-in|mat-ket-noi|chua-cai|tai` to see each state.
+
+UI decisions (taken by me under the skill's "dựng luôn" lane, Yuri can change any of them): one column in a
+~720x800 window; status card first (state, address, loaded tape, refresh), then banners, then groups Cut /
+Mode / Quality / Default size / Connection; check boxes (not switches: switches apply instantly, these wait for
+**Áp dụng**) with a footer bar that says "Có thay đổi chưa áp dụng" and offers "Khôi phục mặc định"; quality as
+three choice cards; default size as a custom grouped select (no native `<select>`); follows the system
+light/dark setting; accent indigo like ResBoost (two places in `styles.css`: light and dark); system font
+(SF) because the app is macOS-only and SF has full Vietnamese; Vietnamese copy; flat, no shadows except the
+select popover. A warning banner appears when the loaded tape does not match the default size's tape.
+Chain is shown locked ("Chưa dùng được"). "In thử nhãn" and "Cài lại driver" are disabled placeholders
+("Sắp có"): test print must go through `NetworkPrinter` (full pre-flight), driver install needs admin rights.
+
+Not done: test print, driver install/repair, Bonjour discovery, packaging (`.app`), app icon of our own, on-printer
+check that the sandboxed filter reads the queue defaults (phase 1).
+
 ## Licensing
 
 Anything linking `ptouch-core` is GPL-3.0-or-later. That is fine for internal use and a
@@ -234,12 +256,11 @@ option overrode one of them, and a job that names no page size is trimmed becaus
 `Auto`. Still to do for phase 1: reinstall, change a default with `lpadmin` on the real queue and
 print once to confirm the sandboxed filter really reads `$PPD`.
 
-**Printer state:** 9 mm tape is loaded and the printer has reported ERROR since a mismatched
-36 mm test job; Yuri says the panel is clear but web/SNMP still say ERROR. Do not print until
-`ptouch info --host` says Idle.
+**Printer state (2026-10-07 evening):** idle, 36 mm tape loaded, error cleared. Re-read it with
+`cargo run -q -p ptouch-settings --example show` before any print.
 
 **Open items:**
-- Settings app: phase 1 needs the on-printer check above. Phase 2 is coded in `crates/ptouch-settings`
+- Settings app: phase 1 needs the on-printer check above. Phases 3 (UI) and most of 4 are built, see "Settings app: state". Phase 2 is coded in `crates/ptouch-settings`
   (`queue`: read/apply the queue defaults and the printer address through `lpoptions`/`lpstat`/`lpadmin`;
   `status`: live state through `ptouch-core`; `cargo run -p ptouch-settings --example show` reads both from
   the real queue). Not done in phase 2: finding the printer by Bonjour. Next: phase 3, UI design with `evon:ui-ux`.
