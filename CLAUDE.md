@@ -168,16 +168,21 @@ The resulting system is written down in `settings-app/DESIGN.md`; follow that fi
 Language: the app has a VI | EN switch (default Vietnamese). **Every user-facing string goes in `ui/i18n.js` in both
 languages**, never inline. Outfit (suggested by the skill) has no Vietnamese; use Work Sans.
 
-UI decisions (first built under the previous skill's "dựng luôn" lane, since restyled; Yuri can change any of them): one column in a
-~720x800 window; status card first (state, address, loaded tape, refresh), then banners, then groups Cut /
-Mode / Quality / Default size / Connection; check boxes (not switches: switches apply instantly, these wait for
-**Áp dụng**) with a footer bar that says "Có thay đổi chưa áp dụng" and offers "Khôi phục mặc định"; quality as
-three choice cards; default size as a custom grouped select (no native `<select>`); follows the system
-light/dark setting; navy accent from the ui-ux-pro-max palette (tokens in `styles.css`, light and dark measured
-separately); Work Sans bundled in `settings-app/ui/fonts/` (latin and vietnamese woff2 plus OFL.txt), SF as the fallback; Vietnamese and English copy; flat,
-no shadows except the select popover; 44px controls. A warning banner appears when the loaded tape does not match the default size's tape.
-Chain is shown locked ("Chưa dùng được"). "In thử nhãn" and "Cài lại driver" are disabled placeholders
-("Sắp có"): test print must go through `NetworkPrinter` (full pre-flight), driver install needs admin rights.
+UI decisions (Yuri can change any of them): compact, no explanatory paragraphs; descriptions of options live in
+tooltips (`title`), not on screen. One column across the whole ~720x800 window (12px margins, no width cap),
+fits without scrolling. Status card first (state, address, loaded tape, refresh), then banners, then cards:
+Print options (check boxes in two columns: half cut, full cut, mirror, chain; check boxes, not switches, because
+switches apply instantly and these wait for **Áp dụng**), Quality (three choice cards in a row), Default size (custom
+grouped select, no native `<select>`), Printer address. Footer bar says "Có thay đổi chưa áp dụng" and offers
+"Khôi phục mặc định". Follows the system light/dark setting; navy accent from the ui-ux-pro-max palette (tokens in
+`styles.css`, light and dark measured separately); Work Sans bundled in `settings-app/ui/fonts/` (latin and vietnamese
+woff2 plus OFL.txt), SF as the fallback; Vietnamese and English copy; flat, no shadows except the select popover;
+44px controls. A warning banner appears when the loaded tape does not match the default size's tape. Chain is shown
+locked ("Chưa có"). Test print and driver reinstall buttons were removed until they are built (test print must go
+through `NetworkPrinter` with full pre-flight, driver install needs admin rights).
+
+Dev note: `cargo tauri dev` embeds `ui/` at compile time and does not reload it. After editing `ui/`, touch
+`src-tauri/src/main.rs` (or restart) or the window keeps showing the old UI.
 
 Not done: test print, driver install/repair, Bonjour discovery, packaging (`.app`), app icon of our own, on-printer
 check that the sandboxed filter reads the queue defaults (phase 1).

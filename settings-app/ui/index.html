@@ -12,10 +12,7 @@
   <div class="app">
     <main class="page" id="page">
       <header class="head">
-        <div class="head-text">
-          <h1 data-i18n="head.title"></h1>
-          <p data-i18n="head.sub"></p>
-        </div>
+        <h1 data-i18n="head.title"></h1>
         <div class="lang" role="group" data-i18n-aria="lang.label" id="lang">
           <button type="button" data-lang="vi" lang="vi" aria-label="Tiếng Việt" title="Tiếng Việt">VI</button>
           <button type="button" data-lang="en" lang="en" aria-label="English" title="English">EN</button>
@@ -26,43 +23,24 @@
       <div class="alerts" id="alerts"></div>
 
       <div id="form">
-        <section class="card" aria-labelledby="h-cut">
-          <h2 id="h-cut" data-i18n="cut.h"></h2>
+        <section class="card" aria-labelledby="h-opt">
+          <h2 id="h-opt" data-i18n="opt.h"></h2>
           <div class="rows">
-            <label class="row">
+            <label class="row" data-i18n-title="half.desc">
               <input type="checkbox" id="half_cut" />
-              <span class="row-text">
-                <span class="row-title" data-i18n="half.title"></span>
-                <span class="row-desc" data-i18n="half.desc"></span>
-              </span>
+              <span class="row-title" data-i18n="half.title"></span>
             </label>
-            <label class="row">
+            <label class="row" data-i18n-title="full.desc">
               <input type="checkbox" id="full_cut" />
-              <span class="row-text">
-                <span class="row-title" data-i18n="full.title"></span>
-                <span class="row-desc" data-i18n="full.desc"></span>
-              </span>
+              <span class="row-title" data-i18n="full.title"></span>
             </label>
-          </div>
-          <p class="note" data-i18n="cut.note"></p>
-        </section>
-
-        <section class="card" aria-labelledby="h-mode">
-          <h2 id="h-mode" data-i18n="mode.h"></h2>
-          <div class="rows">
-            <label class="row">
+            <label class="row" data-i18n-title="mirror.desc">
               <input type="checkbox" id="mirror" />
-              <span class="row-text">
-                <span class="row-title" data-i18n="mirror.title"></span>
-                <span class="row-desc" data-i18n="mirror.desc"></span>
-              </span>
+              <span class="row-title" data-i18n="mirror.title"></span>
             </label>
-            <label class="row is-locked">
+            <label class="row is-locked" data-i18n-title="chain.desc">
               <input type="checkbox" id="chain" disabled />
-              <span class="row-text">
-                <span class="row-title"><span data-i18n="chain.title"></span> <span class="tag"><svg class="icon" data-i="lock"></svg><span data-i18n="chain.tag"></span></span></span>
-                <span class="row-desc" data-i18n="chain.desc"></span>
-              </span>
+              <span class="row-title"><span data-i18n="chain.title"></span> <span class="tag"><svg class="icon" data-i="lock"></svg><span data-i18n="chain.tag"></span></span></span>
             </label>
           </div>
         </section>
@@ -74,25 +52,17 @@
 
         <section class="card" aria-labelledby="h-size">
           <h2 id="h-size" data-i18n="size.h"></h2>
-          <p class="hint" data-i18n="size.hint"></p>
           <div class="select" id="size"></div>
         </section>
       </div>
 
       <section class="card" id="conn" aria-labelledby="h-conn">
         <h2 id="h-conn" data-i18n="conn.h"></h2>
-        <label class="field" for="host" data-i18n="conn.label"></label>
         <div class="field-row">
-          <input class="input" id="host" inputmode="url" autocomplete="off" spellcheck="false" placeholder="192.168.99.107" aria-describedby="host-error host-hint" />
+          <input class="input" id="host" inputmode="url" autocomplete="off" spellcheck="false" placeholder="192.168.99.107" aria-labelledby="h-conn" aria-describedby="host-error" data-i18n-title="conn.hint" />
           <button class="btn btn-outline" id="save-host" type="button" data-i18n="conn.save"></button>
         </div>
         <p class="field-error" id="host-error" role="alert" hidden></p>
-        <p class="hint" id="host-hint" data-i18n="conn.hint"></p>
-        <div class="actions">
-          <button class="btn btn-outline" type="button" disabled><svg class="icon" data-i="printer"></svg><span data-i18n="conn.test"></span></button>
-          <button class="btn btn-outline" type="button" disabled><svg class="icon" data-i="refresh"></svg><span data-i18n="conn.reinstall"></span></button>
-          <span class="soon" data-i18n="conn.soon"></span>
-        </div>
       </section>
     </main>
 

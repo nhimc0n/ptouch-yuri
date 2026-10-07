@@ -7,28 +7,25 @@
 const I18N = {
   vi: {
     "lang.label": "Ngôn ngữ",
-    "head.title": "Cài đặt máy in nhãn",
-    "head.sub": "Brother PT-E850TKW. Chọn một lần, áp dụng cho mọi ứng dụng khi in.",
+    "head.title": "PT-E850TKW",
 
-    "cut.h": "Cắt nhãn",
-    "half.title": "Cắt nửa, giữ lớp giấy lót",
-    "half.desc": "Cắt qua lớp nhãn nhưng giữ giấy lót, dễ bóc và dễ cầm.",
+    "opt.h": "Tuỳ chọn in",
+    "half.title": "Cắt nửa",
+    "half.desc": "Cắt qua lớp nhãn nhưng giữ giấy lót. Bật cả hai kiểu cắt thì cắt nửa được ưu tiên, tắt cả hai thì máy không cắt.",
     "full.title": "Cắt đứt hẳn",
     "full.desc": "Cắt rời cả nhãn lẫn giấy lót sau mỗi lần in.",
-    "cut.note": "Bật cả hai thì cắt nửa được ưu tiên. Tắt cả hai thì máy không cắt, nhãn được đẩy ra để xé tay.",
 
-    "mode.h": "Chế độ in",
-    "mirror.title": "In lật chữ (như soi gương)",
+    "mirror.title": "In lật chữ",
     "mirror.desc": "Dùng khi đọc nhãn xuyên từ mặt sau, ví dụ nhãn trong suốt dán lên kính.",
-    "chain.title": "In liền, không cắt giữa các nhãn",
-    "chain.tag": "Chưa dùng được",
-    "chain.desc": "Cần ghi lại cách máy nhận nhiều nhãn liền nhau. Sẽ có ở bản sau.",
+    "chain.title": "In liền",
+    "chain.tag": "Chưa có",
+    "chain.desc": "Không cắt giữa các nhãn. Cần ghi lại cách máy nhận nhiều nhãn liền nhau, sẽ có ở bản sau.",
 
     "quality.h": "Chất lượng in",
     "q.Normal.title": "Thường",
     "q.Normal.meta": "360 × 360 dpi",
     "q.Normal.desc": "Nhanh, đủ rõ cho hầu hết nhãn.",
-    "q.High.title": "Chất lượng cao",
+    "q.High.title": "Cao",
     "q.High.meta": "chậm hơn",
     "q.High.desc": "In chậm hơn để nét đều hơn, cùng độ phân giải.",
     "q.HiRes.title": "Độ phân giải cao",
@@ -36,7 +33,6 @@ const I18N = {
     "q.HiRes.desc": "Chậm nhất, mịn hơn theo chiều dọc băng. Chỉ dùng cho băng TZe phủ nhựa.",
 
     "size.h": "Khổ nhãn mặc định",
-    "size.hint": "Dùng khi ứng dụng không chọn khổ. Khổ tự động cắt bỏ phần trắng, nhãn dài vừa nội dung.",
     "size.g.auto": "Tự động theo nội dung",
     "size.g.l36": "Cố định, băng 36 mm, nhãn ngang",
     "size.g.p36": "Cố định, băng 36 mm, nhãn dọc",
@@ -47,13 +43,9 @@ const I18N = {
     "size.Auto9": "Tự động theo nội dung",
     "size.tape": "băng {mm} mm",
 
-    "conn.h": "Kết nối",
-    "conn.label": "Địa chỉ máy in",
-    "conn.save": "Lưu địa chỉ",
-    "conn.hint": "Địa chỉ IP của máy in trong mạng. Nên đặt IP cố định trên router để khỏi phải đổi.",
-    "conn.test": "In thử nhãn",
-    "conn.reinstall": "Cài lại driver",
-    "conn.soon": "Sắp có",
+    "conn.h": "Địa chỉ máy in",
+    "conn.save": "Lưu",
+    "conn.hint": "Địa chỉ IP của máy in trong mạng. Nên đặt IP cố định trên router.",
 
     "bar.dirty": "Có thay đổi chưa áp dụng",
     "bar.applied": "Đã áp dụng. Có tác dụng từ lần in tiếp theo, ở mọi ứng dụng.",
@@ -93,28 +85,25 @@ const I18N = {
   },
   en: {
     "lang.label": "Language",
-    "head.title": "Label printer settings",
-    "head.sub": "Brother PT-E850TKW. Set it once, it applies to every app you print from.",
+    "head.title": "PT-E850TKW",
 
-    "cut.h": "Cutting",
-    "half.title": "Half cut, keep the backing",
-    "half.desc": "Cuts through the label but keeps the backing paper, easy to peel and handle.",
+    "opt.h": "Print options",
+    "half.title": "Half cut",
+    "half.desc": "Cuts through the label but keeps the backing paper. If both cuts are on, half cut wins; if both are off, the printer does not cut.",
     "full.title": "Full cut",
     "full.desc": "Cuts the label and the backing paper apart after every print.",
-    "cut.note": "If both are on, half cut wins. If both are off, the printer does not cut and feeds the label out to tear off by hand.",
 
-    "mode.h": "Print mode",
-    "mirror.title": "Mirror print (like a mirror image)",
+    "mirror.title": "Mirror print",
     "mirror.desc": "Use when the label is read from behind, such as a clear label stuck on glass.",
-    "chain.title": "Chain printing, no cut between labels",
-    "chain.tag": "Not available yet",
-    "chain.desc": "How the printer receives several labels in a row still has to be recorded. Coming in a later version.",
+    "chain.title": "Chain printing",
+    "chain.tag": "Not yet",
+    "chain.desc": "No cut between labels. How the printer receives several labels in a row still has to be recorded; coming later.",
 
     "quality.h": "Print quality",
     "q.Normal.title": "Normal",
     "q.Normal.meta": "360 × 360 dpi",
     "q.Normal.desc": "Fast and clear enough for most labels.",
-    "q.High.title": "High quality",
+    "q.High.title": "High",
     "q.High.meta": "slower",
     "q.High.desc": "Prints slower for more even, sharper output at the same resolution.",
     "q.HiRes.title": "High resolution",
@@ -122,7 +111,6 @@ const I18N = {
     "q.HiRes.desc": "Slowest, smoother along the tape length. Laminated TZe tape only.",
 
     "size.h": "Default label size",
-    "size.hint": "Used when an app does not choose a size. Automatic sizes trim the blank space so the label is as long as its content.",
     "size.g.auto": "Automatic, fits the content",
     "size.g.l36": "Fixed, 36 mm tape, landscape",
     "size.g.p36": "Fixed, 36 mm tape, portrait",
@@ -133,13 +121,9 @@ const I18N = {
     "size.Auto9": "Automatic",
     "size.tape": "{mm} mm tape",
 
-    "conn.h": "Connection",
-    "conn.label": "Printer address",
-    "conn.save": "Save address",
-    "conn.hint": "The printer's IP address on your network. Set a fixed IP on the router so you do not have to change it.",
-    "conn.test": "Test print",
-    "conn.reinstall": "Reinstall driver",
-    "conn.soon": "Coming soon",
+    "conn.h": "Printer address",
+    "conn.save": "Save",
+    "conn.hint": "The printer's IP address on your network. Set a fixed IP on the router.",
 
     "bar.dirty": "You have unapplied changes",
     "bar.applied": "Applied. Takes effect on the next print, in every app.",
@@ -206,6 +190,7 @@ function setLang(next) {
 function applyStaticText() {
   document.documentElement.lang = lang;
   for (const el of document.querySelectorAll("[data-i18n]")) el.textContent = t(el.dataset.i18n);
+  for (const el of document.querySelectorAll("[data-i18n-title]")) el.title = t(el.dataset.i18nTitle);
   for (const el of document.querySelectorAll("[data-i18n-aria]")) el.setAttribute("aria-label", t(el.dataset.i18nAria));
   for (const button of document.querySelectorAll("#lang button")) button.setAttribute("aria-pressed", String(button.dataset.lang === lang));
 }

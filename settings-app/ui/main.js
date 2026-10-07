@@ -159,8 +159,8 @@ function renderAlerts() {
 
 function renderQuality() {
   $("quality").innerHTML = QUALITY_KEYS.map((key) => `
-    <label class="choice"><input type="radio" name="quality" value="${key}" ${state.form.quality === key ? "checked" : ""} />
-      <span class="choice-text"><span class="choice-title">${t(`q.${key}.title`)}<span class="choice-meta">${t(`q.${key}.meta`)}</span></span><span class="choice-desc">${t(`q.${key}.desc`)}</span></span></label>`).join("");
+    <label class="choice" title="${t(`q.${key}.desc`)}"><input type="radio" name="quality" value="${key}" ${state.form.quality === key ? "checked" : ""} />
+      <span class="choice-text"><span class="choice-title">${t(`q.${key}.title`)}</span><span class="choice-meta">${t(`q.${key}.meta`)}</span></span></label>`).join("");
   for (const input of document.querySelectorAll('input[name="quality"]')) {
     input.addEventListener("change", () => { state.form.quality = input.value; state.applied = false; state.error = null; renderBar(); });
   }
