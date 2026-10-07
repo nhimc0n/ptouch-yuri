@@ -31,3 +31,5 @@ __pycache__/
 
 # Raw Wireshark captures stay local; extracted jobs live in fixtures/jobs
 fixtures/captures/*.pcapng
+settings-app/src-tauri/target
+settings-app/src-tauri/gen

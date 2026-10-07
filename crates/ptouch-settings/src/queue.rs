@@ -7,6 +7,7 @@
 //! The parsing and the argument building are pure functions so they can be
 //! tested without a print queue.
 
+use serde::{Deserialize, Serialize};
 use std::process::Command;
 
 /// Name of the print queue created by `scripts/install-cups-macos.sh`.
@@ -18,7 +19,7 @@ pub const LPR_QUEUE: &str = "BINARY_P1";
 pub type Result<T> = std::result::Result<T, String>;
 
 /// Print quality, the `LabelQuality` driver option.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum Quality {
     /// 360 x 360 dpi.
     Normal,
@@ -49,7 +50,7 @@ impl Quality {
 }
 
 /// The driver settings stored in the queue.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct DriverSettings {
     /// Cut the label but keep the backing paper.
     pub half_cut: bool,

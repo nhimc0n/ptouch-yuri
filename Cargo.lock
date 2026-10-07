@@ -3157,6 +3157,7 @@ name = "ptouch-settings"
 version = "0.8.5"
 dependencies = [
  "ptouch-core",
+ "serde",
 ]
 
 [[package]]
