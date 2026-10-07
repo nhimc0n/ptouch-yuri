@@ -140,7 +140,11 @@ builds the job, CUPS' built-in `lpd` backend delivers it to `lpd://<ip>/BINARY_P
 (pages > 1 or copies > 1 are refused). Page size `Auto` (default, 400 mm page) trims blank
 lines at both ends (2 mm kept) so the label is as long as its content; fixed sizes and `Custom` (15-1000 mm
 long x 36 mm) print the page length exactly. The printer adds a 14 dot (~1 mm) feed margin at each end (measured: 50 mm page -> 52 mm, 80 mm -> 82 mm),
-so for fixed/custom sizes the filter drops 14 lines from each end of the page and the label is exactly the chosen length. Dry run without a printer:
+so for fixed/custom sizes the filter drops 14 lines from each end of the page and the label is exactly the chosen length.
+**Portrait documents** (page width = 36 mm, height = length, the usual label-PDF layout, e.g. Yuri's `1400000068.pdf`
+36x75 mm) are supported next to landscape ones: the filter rotates a portrait page a quarter turn
+counterclockwise (page top = leading edge). PPD has portrait sizes `P50..P200`, `AutoP`, and custom sizes where
+either side may be 36 mm. UNVERIFIED(E850): which way up the printed text appears for portrait pages. Dry run without a printer:
 `cupsfilter -p data/cups/PT-E850TKW.ppd -m application/vnd.cups-raster in.pdf > in.ras` then
 `rastertoptouch --dry-run in.ras out.bin`. Install/reinstall with `scripts/install-cups-macos.sh <ip>` (sudo).
 
