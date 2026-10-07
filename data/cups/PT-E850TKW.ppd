@@ -141,16 +141,16 @@
 *OpenUI *CutMode/Cut Mode: PickOne
 *OrderDependency: 30 AnySetup *CutMode
 *DefaultCutMode: Half
-*CutMode Half/Half cut - cut the label, keep the backing paper: ""
-*CutMode Full/Full cut - cut through the label and the backing paper: ""
-*CutMode None/No cut - feed the tape out and tear it off by hand: ""
+*CutMode Half/Half cut - cut the label, keep the backing paper: "<<>>setpagedevice"
+*CutMode Full/Full cut - cut through the label and the backing paper: "<<>>setpagedevice"
+*CutMode None/No cut - feed the tape out and tear it off by hand: "<<>>setpagedevice"
 *CloseUI: *CutMode
 
 *OpenUI *Mirror/Mirror Print: PickOne
 *OrderDependency: 31 AnySetup *Mirror
 *DefaultMirror: Off
-*Mirror Off/Off - normal print: ""
-*Mirror On/On - mirror image, to read through a clear label: ""
+*Mirror Off/Off - normal print: "<<>>setpagedevice"
+*Mirror On/On - mirror image, to read through a clear label: "<<>>setpagedevice"
 *CloseUI: *Mirror
 *CloseGroup: Label
 
