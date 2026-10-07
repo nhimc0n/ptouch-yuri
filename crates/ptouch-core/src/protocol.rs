@@ -289,20 +289,35 @@ pub fn info_media_type(status_media_type: u8) -> Option<u8> {
 
 /// Construct the PT-P900-style info command (ESC i z).
 ///
-/// E850-verified for TZe 36 mm (P-touch Editor captures, 2026-10-06): valid
-/// flags 0x84 (media width + printer recovery, so the printer itself rejects a
-/// width mismatch), media type 0x00, media length 0, and page byte 2 for a
-/// single/last page. UNVERIFIED(E850): for HSe (type != 0) we also set the
-/// "media type valid" flag 0x02 as the PT-P900 reference describes, and a page
-/// byte other than 2 for pages that are followed by more.
+/// E850-verified for TZe 36 mm (P-touch Editor captures, 2026-10-06/07):
+/// - normal: valid flags 0x84 (media width + printer recovery, so the printer
+///   itself rejects a width mismatch), media type 0x00;
+/// - `quality_priority` ("give priority to print quality", slower): flag 0x40
+///   added (0xC4), raster unchanged;
+/// - `high_res` (360 x 720 dpi): flags 0x86 and media type 0x09, with twice
+///   the raster lines (see `cmd_advanced_mode` and `cmd_page_flags`).
+///
+/// Page byte 2 for a single/last page. UNVERIFIED(E850): for HSe (type != 0)
+/// we set the "media type valid" flag 0x02 as the PT-P900 reference describes,
+/// and a page byte other than 2 for pages that are followed by more.
 pub fn cmd_info_p900(
     info_media_type: u8,
     media_width: u8,
     raster_lines: u32,
     last_page: bool,
+    quality_priority: bool,
+    high_res: bool,
 ) -> Vec<u8> {
-    let flags = if info_media_type == 0x00 { 0x84 } else { 0x86 };
-    let mut buf = vec![0x1B, 0x69, 0x7A, flags, info_media_type, media_width, 0x00];
+    let mut flags = if high_res || info_media_type != 0x00 {
+        0x86
+    } else {
+        0x84
+    };
+    if quality_priority {
+        flags |= 0x40;
+    }
+    let media_type = if high_res { 0x09 } else { info_media_type };
+    let mut buf = vec![0x1B, 0x69, 0x7A, flags, media_type, media_width, 0x00];
     buf.extend_from_slice(&raster_lines.to_le_bytes());
     buf.push(if last_page { 0x02 } else { 0x00 }); // n9: page
     buf.push(0x00); // n10
@@ -359,8 +374,14 @@ pub struct JobOptions {
     pub chain_print: bool,
     /// Request the precut command (only sent if the device supports it).
     pub precut: bool,
-    /// Print quality (only acted on if the device supports it).
+    /// Print quality (only acted on if the device supports it). For
+    /// `P900_RASTER` models only `Standard` and `HighRes` exist, and the raster
+    /// lines passed in must already be at the chosen feed resolution (720 dpi
+    /// for `HighRes`).
     pub quality: PrintQuality,
+    /// "Give priority to print quality": slower printing at the same raster
+    /// (`P900_RASTER` models only).
+    pub quality_priority: bool,
 }
 
 /// Append raster lines (blank ones as `Z`), each repeated `repeat` times.
@@ -428,6 +449,12 @@ pub fn build_print_job(lines: &[Vec<u8>], flags: DeviceFlags, opts: &JobOptions)
         let Some(kind) = info_media_type(opts.media_type) else {
             return Vec::new();
         };
+        let high_res = match opts.quality {
+            PrintQuality::Standard => false,
+            // E850-verified on laminated TZe only; draft was captured but is not offered.
+            PrintQuality::HighRes if kind == 0x00 => true,
+            PrintQuality::HighRes | PrintQuality::Draft => return Vec::new(),
+        };
         if let Some(number) = opts.job_number {
             job.push(cmd_job_tag(number));
         }
@@ -436,20 +463,32 @@ pub fn build_print_job(lines: &[Vec<u8>], flags: DeviceFlags, opts: &JobOptions)
             opts.media_width,
             line_count,
             !opts.chain_print,
+            opts.quality_priority,
+            high_res,
         ));
         if opts.precut {
             job.push(cmd_precut(true));
             job.push(cmd_cut_every(1));
         }
         job.push(cmd_advanced_mode(
-            PrintQuality::Standard,
+            if high_res {
+                PrintQuality::HighRes
+            } else {
+                PrintQuality::Standard
+            },
             false,
             !opts.chain_print,
             opts.half_cut,
         ));
         job.push(cmd_esc_i_k_lower());
-        let margin = opts.margin_dots.max(MIN_MARGIN_DOTS);
-        job.push(cmd_page_flags(margin));
+        // The margin is counted in dots of the feed resolution: 28 at 720 dpi is
+        // the same 1 mm as 14 at 360 dpi (E850-verified, highres capture).
+        let minimum = if high_res {
+            MIN_MARGIN_DOTS * 2
+        } else {
+            MIN_MARGIN_DOTS
+        };
+        job.push(cmd_page_flags(opts.margin_dots.max(minimum)));
         job.push(cmd_enable_packbits());
         push_raster_lines(&mut job, &selected, repeat, true);
         job.push(cmd_finalize(opts.chain_print, flags));
@@ -861,12 +900,15 @@ mod tests {
     fn test_info_p900_matches_reference_encoder_bytes() {
         // P-touch Editor (E850 capture): 0x84, type 0, width, 0, lines LE u32, page 2, 0
         assert_eq!(
-            cmd_info_p900(0x00, 9, 0x0000_0150, true),
+            cmd_info_p900(0x00, 9, 0x0000_0150, true, false, false),
             [
                 0x1B, 0x69, 0x7A, 0x84, 0x00, 0x09, 0x00, 0x50, 0x01, 0x00, 0x00, 0x02, 0x00
             ]
         );
-        assert_eq!(cmd_info_p900(0x11, 9, 1, false)[3..6], [0x86, 0x11, 0x09]);
+        assert_eq!(
+            cmd_info_p900(0x11, 9, 1, false, false, false)[3..6],
+            [0x86, 0x11, 0x09]
+        );
     }
 
     #[test]
@@ -1004,5 +1046,85 @@ mod tests {
         ));
         assert!(!job.windows(3).any(|w| w == [0x1B, 0x69, 0x4B]));
         assert!(!job.windows(3).any(|w| w == [0x1B, 0x69, 0x64]));
+    }
+
+    /// The 10 bytes after `ESC i <command>` in a captured job.
+    fn captured(job: &[u8], command: u8, len: usize) -> Vec<u8> {
+        let at = job
+            .windows(3)
+            .position(|w| w == [0x1B, 0x69, command])
+            .expect("command present");
+        job[at..at + 3 + len].to_vec()
+    }
+
+    #[test]
+    fn test_quality_priority_matches_the_p_touch_editor_capture() {
+        // "Give priority to print quality": same raster, flag 0x40 added (0xC4).
+        let job: &[u8] = include_bytes!("../../../fixtures/jobs/cap_highquarity.bin");
+        assert_eq!(
+            cmd_info_p900(0x00, 36, 323, true, true, false),
+            captured(job, 0x7A, 10)
+        );
+        assert_eq!(
+            cmd_advanced_mode(PrintQuality::Standard, false, false, true),
+            captured(job, 0x4B, 1)
+        );
+        assert_eq!(cmd_page_flags(14), captured(job, 0x64, 2));
+    }
+
+    #[test]
+    fn test_high_resolution_matches_the_p_touch_editor_capture() {
+        // 360 x 720: type 0x09, K bit 6, margin 28 dots, twice the raster lines.
+        let job: &[u8] = include_bytes!("../../../fixtures/jobs/cap_highres.bin");
+        assert_eq!(
+            cmd_info_p900(0x00, 36, 645, true, false, true),
+            captured(job, 0x7A, 10)
+        );
+        assert_eq!(
+            cmd_advanced_mode(PrintQuality::HighRes, false, false, true),
+            captured(job, 0x4B, 1)
+        );
+        assert_eq!(cmd_page_flags(28), captured(job, 0x64, 2));
+    }
+
+    #[test]
+    fn test_job_p900_high_resolution_and_quality_priority_headers() {
+        let lines = vec![line_70(1); 645];
+        let hires = JobOptions {
+            media_width: 36,
+            media_type: 0x01,
+            quality: PrintQuality::HighRes,
+            ..JobOptions::default()
+        };
+        let job = flat(&build_print_job(&lines, e850_flags(), &hires));
+        assert!(job.windows(6).any(|w| w == [0x7A, 0x86, 0x09, 36, 0, 0x85]));
+        assert!(job.windows(5).any(|w| w == [0x1B, 0x69, 0x64, 28, 0])); // margin 28 at 720 dpi
+        assert!(job.windows(4).any(|w| w == [0x1B, 0x69, 0x4B, 0x48])); // hi-res + cut at end
+        assert!(!job.windows(4).any(|w| w == [0x1B, 0x69, 0x4B, 0x4C]));
+
+        let priority = JobOptions {
+            media_width: 36,
+            media_type: 0x01,
+            quality_priority: true,
+            ..JobOptions::default()
+        };
+        let job = flat(&build_print_job(&lines[..323], e850_flags(), &priority));
+        assert!(job.windows(5).any(|w| w == [0x7A, 0xC4, 0x00, 36, 0]));
+    }
+
+    #[test]
+    fn test_job_p900_refuses_unverified_quality_modes() {
+        for (quality, media_type) in [
+            (PrintQuality::Draft, 0x01),
+            (PrintQuality::HighRes, 0x11), // high resolution only verified on tape
+        ] {
+            let opts = JobOptions {
+                media_width: 9,
+                media_type,
+                quality,
+                ..JobOptions::default()
+            };
+            assert!(build_print_job(&[line_70(1)], e850_flags(), &opts).is_empty());
+        }
     }
 }
