@@ -14,6 +14,8 @@
 *cupsVersion: 2.4
 *cupsModelNumber: 0
 *cupsFilter: "application/vnd.cups-raster 0 /Library/Printers/PTouchE850/rastertoptouch"
+*% UNVERIFIED: macOS may show an "Open Printer Utility" button in Printers & Scanners that opens this app.
+*APPrinterUtilityPath: "/Applications/PT-E850TKW.app"
 *ColorDevice: False
 *DefaultColorSpace: Gray
 *TTRasterizer: Type42

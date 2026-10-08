@@ -187,8 +187,18 @@ unapplied changes or the printer is not ready. The driver reinstall button was r
 Dev note: `cargo tauri dev` embeds `ui/` at compile time and does not reload it. After editing `ui/`, touch
 `src-tauri/src/main.rs` (or restart) or the window keeps showing the old UI.
 
-Not done: driver install/repair, Bonjour discovery, packaging (`.app`), app icon of our own, on-printer
-check that the sandboxed filter reads the queue defaults (phase 1).
+Packaging (macOS 27): `cargo tauri build` fails with E0463 ("mis-aligned LINKEDIT string pool"): the linker writes proc-macro
+dylibs that `dlopen` rejects, intermittently. `[profile.release.build-override] opt-level = 0` in `src-tauri/Cargo.toml`
+reduces it. Recipe that worked (2026-10-08): `cd settings-app/src-tauri && cargo build --bins --features
+tauri/custom-protocol --release` (repeat if it hits E0463; delete `target/release` if a dylib stays corrupt), then
+`cd .. && cargo tauri bundle --bundles app` (packages the existing binary), then
+`codesign --force --deep -s - src-tauri/target/release/bundle/macos/PT-E850TKW.app`. Do not build while `cargo tauri dev`
+runs (same `target/`). Own icon: `make-icon.py` draws `icon-source.png`, `cargo tauri icon ../icon-source.png` makes the
+sizes. `scripts/install-cups-macos.sh` copies the app to `/Applications` when it is built, and the PPD names it in
+`*APPrinterUtilityPath` (UNVERIFIED that macOS shows an "Open Printer Utility" button for it).
+
+Not done: driver install/repair, Bonjour discovery, on-printer check that the sandboxed filter reads the queue
+defaults (phase 1; the test print button is the way to do it).
 
 ## Licensing
 

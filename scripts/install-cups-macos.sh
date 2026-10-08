@@ -13,20 +13,28 @@ set -euo pipefail
 
 NAME="PT-E850TKW"
 DEST="/Library/Printers/PTouchE850"
+APP_NAME="PT-E850TKW.app"
+APP_DEST="/Applications/$APP_NAME"
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 
 if [ "${1:-}" = "--uninstall" ]; then
     sudo lpadmin -x "$NAME" 2>/dev/null || true
-    sudo rm -rf "$DEST"
+    sudo rm -rf "$DEST" "$APP_DEST"
     echo "Removed $NAME"
     exit 0
 fi
 
+APP_SRC="$ROOT/settings-app/src-tauri/target/release/bundle/macos/$APP_NAME"
 HOST="${1:?usage: $0 <printer-host-or-ip> | --uninstall}"
 
 echo "This will:"
 echo "  - build rastertoptouch (cargo build --release)"
 echo "  - copy it and the PPD to $DEST"
+if [ -d "$APP_SRC" ]; then
+    echo "  - copy the settings app to $APP_DEST"
+else
+    echo "  - (settings app not built, skipping: cd settings-app && cargo tauri build --bundles app)"
+fi
 echo "  - create a print queue '$NAME' -> lpd://$HOST/BINARY_P1"
 read -r -p "Continue? [y/N] " answer
 [ "$answer" = "y" ] || { echo "Cancelled"; exit 1; }
@@ -40,7 +48,13 @@ sudo chown -R root:wheel "$DEST"
 sudo chmod 755 "$DEST" "$DEST/rastertoptouch"
 sudo chmod 644 "$DEST/PT-E850TKW.ppd"
 
+if [ -d "$APP_SRC" ]; then
+    sudo rm -rf "$APP_DEST"
+    sudo ditto "$APP_SRC" "$APP_DEST"
+fi
+
 sudo lpadmin -p "$NAME" -E -v "lpd://$HOST/BINARY_P1" -P "$DEST/PT-E850TKW.ppd" \
     -D "Brother PT-E850TKW" -L "Label printer"
+[ -d "$APP_DEST" ] && echo "Settings app: $APP_DEST"
 echo "Done. Open any app, choose Print, and select '$NAME'."
 echo "Use a 36 mm cassette. The printer itself rejects a label whose width does not match the loaded tape."

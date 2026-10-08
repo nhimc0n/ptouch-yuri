@@ -23,13 +23,20 @@
     }
   },
   "bundle": {
-    "active": false,
-    "targets": "app",
+    "active": true,
+    "targets": [
+      "app"
+    ],
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",
       "icons/icon.icns",
       "icons/icon.png"
-    ]
+    ],
+    "category": "Utility",
+    "shortDescription": "Settings for the Brother PT-E850TKW label printer",
+    "macOS": {
+      "minimumSystemVersion": "12.0"
+    }
   }
 }
