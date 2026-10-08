@@ -64,6 +64,10 @@ async function call(command, args) {
     if (mode === "chua-cai") throw "The print queue PT-E850TKW was not found. Install the driver first.";
     return structuredClone(MOCK.settings);
   }
+  if (command === "test_print") {
+    if (mode === "loi" || mode === "dang-in") throw "The printer is not ready (state: " + (mode === "loi" ? "error" : "printing") + "). Check it and try again.";
+    return "PT-E850TKW-1";
+  }
   if (command === "set_printer_host" && !/^[\w.-]+$/.test(args.host.trim())) throw "Enter the printer's IP address or host name, for example 192.168.99.107.";
   if (command === "get_printer") return structuredClone(MOCK.printers[mode] || MOCK.printers.ok);
   return null;
@@ -88,7 +92,7 @@ const DEFAULTS = { half_cut: true, full_cut: false, chain: false, mirror: false,
 
 // ---------------------------------------------------------------- state
 const $ = (id) => document.getElementById(id);
-const state = { saved: null, form: null, printer: null, loadingPrinter: true, queueError: false, applied: false, applying: false, error: null, hostError: null };
+const state = { saved: null, form: null, printer: null, loadingPrinter: true, queueError: false, applied: false, applying: false, testing: false, sent: false, error: null, hostError: null };
 const keys = ["half_cut", "full_cut", "chain", "mirror", "quality", "page_size"];
 const isDirty = () => !!state.saved && keys.some((k) => state.form[k] !== state.saved[k]);
 
@@ -162,7 +166,7 @@ function renderQuality() {
     <label class="choice" title="${t(`q.${key}.desc`)}"><input type="radio" name="quality" value="${key}" ${state.form.quality === key ? "checked" : ""} />
       <span class="choice-text"><span class="choice-title">${t(`q.${key}.title`)}</span><span class="choice-meta">${t(`q.${key}.meta`)}</span></span></label>`).join("");
   for (const input of document.querySelectorAll('input[name="quality"]')) {
-    input.addEventListener("change", () => { state.form.quality = input.value; state.applied = false; state.error = null; renderBar(); });
+    input.addEventListener("change", () => { state.form.quality = input.value; state.applied = false; state.sent = false; state.error = null; renderBar(); });
   }
 }
 
@@ -217,8 +221,14 @@ function renderBar() {
   $("apply").disabled = !dirty || state.applying;
   $("apply").toggleAttribute("aria-busy", state.applying);
   $("reset").disabled = state.applying || !state.form || keys.every((k) => state.form[k] === DEFAULTS[k]);
-  if (state.error) { text.dataset.tone = "bad"; text.textContent = state.error; }
+  const st = state.printer?.status;
+  $("test").disabled = !state.form || state.applying || state.testing || dirty || !st?.ready || !st?.tape_supported;
+  $("test").toggleAttribute("aria-busy", state.testing);
+  $("test").title = dirty ? t("test.dirty") : st && !st.ready ? t("test.notready") : "";
+  if (state.testing) { text.dataset.tone = ""; text.textContent = t("test.sending"); }
+  else if (state.error) { text.dataset.tone = "bad"; text.textContent = state.error; }
   else if (dirty) { text.dataset.tone = "dirty"; text.textContent = t("bar.dirty"); }
+  else if (state.sent) { text.dataset.tone = "ok"; text.textContent = t("test.sent"); }
   else if (state.applied) { text.dataset.tone = "ok"; text.textContent = t("bar.applied"); }
   else { text.dataset.tone = ""; text.textContent = state.saved ? t("bar.using") : ""; }
 }
@@ -243,7 +253,7 @@ async function loadPrinter() {
   state.printer = await call("get_printer");
   state.loadingPrinter = false;
   if (state.printer?.host && document.activeElement !== $("host")) $("host").value = state.printer.host;
-  renderStatus(); renderAlerts();
+  renderStatus(); renderAlerts(); renderBar();
 }
 
 async function loadSettings() {
@@ -259,7 +269,7 @@ async function loadSettings() {
 }
 
 async function apply() {
-  state.applying = true; state.error = null; state.applied = false; renderBar();
+  state.applying = true; state.error = null; state.applied = false; state.sent = false; renderBar();
   try {
     await call("apply_settings", { settings: state.form });
     state.saved = structuredClone(state.form);
@@ -268,6 +278,19 @@ async function apply() {
     state.error = t("e.notApplied", { detail: errorText(error) });
   }
   state.applying = false; renderBar();
+}
+
+async function testPrint() {
+  state.testing = true; state.error = null; state.sent = false; renderBar();
+  try {
+    await call("test_print");
+    state.sent = true;
+    // the printer takes a moment to start and finish; look again afterwards
+    setTimeout(loadPrinter, 4000);
+  } catch (error) {
+    state.error = errorText(error);
+  }
+  state.testing = false; renderBar();
 }
 
 async function saveHost() {
@@ -301,6 +324,7 @@ for (const id of ["half_cut", "full_cut", "mirror"]) {
   $(id).addEventListener("change", () => { state.form[id] = $(id).checked; state.applied = false; state.error = null; renderBar(); });
 }
 $("apply").addEventListener("click", apply);
+$("test").addEventListener("click", testPrint);
 $("reset").addEventListener("click", () => { Object.assign(state.form, DEFAULTS); state.applied = false; renderAll(); });
 $("save-host").addEventListener("click", saveHost);
 $("host").addEventListener("input", () => { if (state.hostError) { state.hostError = null; renderHostError(); } });

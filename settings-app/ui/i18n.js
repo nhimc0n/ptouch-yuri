@@ -52,6 +52,11 @@ const I18N = {
     "bar.using": "Đang dùng cài đặt này.",
     "bar.apply": "Áp dụng",
     "bar.reset": "Khôi phục mặc định",
+    "test.btn": "In thử",
+    "test.dirty": "Áp dụng thay đổi trước khi in thử",
+    "test.notready": "Máy in chưa sẵn sàng",
+    "test.sending": "Đang gửi nhãn thử…",
+    "test.sent": "Đã gửi nhãn thử đến máy in.",
 
     "st.idle": "Sẵn sàng in",
     "st.printing": "Máy đang in",
@@ -81,6 +86,9 @@ const I18N = {
 
     "e.notApplied": "Không áp dụng được: {detail}",
     "e.noQueue": "Chưa tìm thấy hàng đợi in PT-E850TKW. Hãy cài driver trước.",
+    "e.notReady": "Máy in chưa sẵn sàng (trạng thái: {state}). Kiểm tra máy rồi thử lại.",
+    "e.noTestLabel": "Chưa có nhãn thử cho băng {mm} mm.",
+    "e.sendFail": "Không gửi được nhãn thử: {detail}",
     "e.badHost": "Nhập địa chỉ IP hoặc tên máy của máy in, ví dụ 192.168.99.107.",
   },
   en: {
@@ -130,6 +138,11 @@ const I18N = {
     "bar.using": "Using these settings.",
     "bar.apply": "Apply",
     "bar.reset": "Restore defaults",
+    "test.btn": "Test print",
+    "test.dirty": "Apply your changes before a test print",
+    "test.notready": "The printer is not ready",
+    "test.sending": "Sending the test label…",
+    "test.sent": "Test label sent to the printer.",
 
     "st.idle": "Ready to print",
     "st.printing": "Printing",
@@ -159,6 +172,9 @@ const I18N = {
 
     "e.notApplied": "Could not apply: {detail}",
     "e.noQueue": "The print queue PT-E850TKW was not found. Install the driver first.",
+    "e.notReady": "The printer is not ready (state: {state}). Check it and try again.",
+    "e.noTestLabel": "There is no test label for {mm} mm tape.",
+    "e.sendFail": "Could not send the test label: {detail}",
     "e.badHost": "Enter the printer's IP address or host name, for example 192.168.99.107.",
   },
 };
@@ -179,6 +195,10 @@ function errorText(error) {
   const raw = String(error);
   if (/was not found/i.test(raw)) return t("e.noQueue");
   if (/Enter the printer's IP/i.test(raw)) return t("e.badHost");
+  let m;
+  if ((m = raw.match(/printer is not ready \(state: (\w+)\)/i))) return t("e.notReady", { state: m[1] });
+  if ((m = raw.match(/test label is not available for (\d+) mm/i))) return t("e.noTestLabel", { mm: m[1] });
+  if ((m = raw.match(/Could not send the test label: (.*)/is))) return t("e.sendFail", { detail: m[1] });
   return raw;
 }
 

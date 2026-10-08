@@ -178,13 +178,16 @@ grouped select, no native `<select>`), Printer address. Footer bar says "Có tha
 `styles.css`, light and dark measured separately); Work Sans bundled in `settings-app/ui/fonts/` (latin and vietnamese
 woff2 plus OFL.txt), SF as the fallback; Vietnamese and English copy; flat, no shadows except the select popover;
 44px controls. A warning banner appears when the loaded tape does not match the default size's tape. Chain is shown
-locked ("Chưa có"). Test print and driver reinstall buttons were removed until they are built (test print must go
-through `NetworkPrinter` with full pre-flight, driver install needs admin rights).
+locked ("Chưa có"). "In thử" (footer) sends a generated PDF through the print queue with `lp`, so it uses the
+saved settings and proves the filter reads them; before sending, the app asks the printer (idle, loaded tape) and
+picks the page size for that tape (36 mm: `L50`, 9 mm: `S9L50`, other tapes: refused). It is disabled while there are
+unapplied changes or the printer is not ready. The driver reinstall button was removed until it is built
+(needs admin rights).
 
 Dev note: `cargo tauri dev` embeds `ui/` at compile time and does not reload it. After editing `ui/`, touch
 `src-tauri/src/main.rs` (or restart) or the window keeps showing the old UI.
 
-Not done: test print, driver install/repair, Bonjour discovery, packaging (`.app`), app icon of our own, on-printer
+Not done: driver install/repair, Bonjour discovery, packaging (`.app`), app icon of our own, on-printer
 check that the sandboxed filter reads the queue defaults (phase 1).
 
 ## Licensing

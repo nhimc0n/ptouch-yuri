@@ -11,6 +11,7 @@
 use ptouch_settings::{
     queue::{self, DriverSettings},
     status::{self, PrinterInfo},
+    testprint,
 };
 
 #[tauri::command(async)]
@@ -33,13 +34,20 @@ fn set_printer_host(host: String) -> Result<(), String> {
     queue::set_printer_host(queue::QUEUE, &host)
 }
 
+/// Sends the test label through the print queue, so it uses the saved settings.
+#[tauri::command(async)]
+fn test_print() -> Result<String, String> {
+    testprint::print_test_label(queue::QUEUE)
+}
+
 fn main() {
     tauri::Builder::default()
         .invoke_handler(tauri::generate_handler![
             get_settings,
             get_printer,
             apply_settings,
-            set_printer_host
+            set_printer_host,
+            test_print
         ])
         .run(tauri::generate_context!())
         .expect("error while running the settings app");
