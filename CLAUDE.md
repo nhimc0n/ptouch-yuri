@@ -203,6 +203,18 @@ runs (same `target/`). Own icon: `make-icon.py` draws `icon-source.png`, `cargo 
 sizes. `scripts/install-cups-macos.sh` copies the app to `/Applications` when it is built, and the PPD names it in
 `*APPrinterUtilityPath` (UNVERIFIED that macOS shows an "Open Printer Utility" button for it).
 
+Installer: `scripts/build-installer.sh` builds `dist/PT-E850TKW-<version>.dmg` (arm64 only). The DMG holds
+`Cài đặt PT-E850TKW.pkg` (driver in `/Library/Printers/PTouchE850` + the app in `/Applications`), `Gỡ cài đặt.command`
+and a bilingual read-me. `installer/scripts/postinstall` (root) fixes permissions and creates the queue: on a fresh
+install it finds the printer with Bonjour (`dns-sd`, "Brother PT-E850TKW" -> `BRW<MAC>.local`), else it leaves
+`lpd://printer.invalid/BINARY_P1`, which the app reads as "no address yet" (`status::is_unset_address`) and asks the
+user to enter one; on an upgrade it keeps the queue's address and the six driver settings. Log:
+`/var/log/ptouch-e850-install.log`. The pkg is unsigned unless `SIGN_APP_ID` / `SIGN_PKG_ID` are set (macOS then asks
+for right-click > Open); there is no notarization. Checked 2026-10-12: package contents and ownership, the DMG, and the
+postinstall logic with stubbed `lpadmin`/`lpstat`/`dns-sd` (fresh found, fresh not found, upgrade). NOT checked: a real
+`installer` run (needs sudo) and a real Bonjour discovery inside the installer. Rebuilding the same version number still
+overwrites the app (`BundleIsVersionChecked` is off).
+
 Not done: driver install/repair, Bonjour discovery, on-printer check that the sandboxed filter reads the queue
 defaults (phase 1; the test print button is the way to do it).
 

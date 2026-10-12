@@ -1,0 +1,79 @@
+#!/bin/bash
+# SPDX-License-Identifier: GPL-3.0-or-later
+#
+# Runs as root after the installer has copied the files. Sets the permissions
+# CUPS needs and creates (or updates) the print queue "PT-E850TKW".
+#
+# - Fresh install: looks for the printer with Bonjour (it advertises itself as
+#   "Brother PT-E850TKW" with a name that does not change, BRW<MAC>.local). If
+#   none answers, the queue gets an address that cannot resolve and the settings
+#   app asks for the address on first run.
+# - Upgrade: keeps the queue's address and the driver settings the user chose.
+#
+# Everything is logged to /var/log/ptouch-e850-install.log.
+LOG=/var/log/ptouch-e850-install.log
+exec >>"$LOG" 2>&1
+echo "=== $(date) postinstall ==="
+
+NAME="PT-E850TKW"
+DEST="/Library/Printers/PTouchE850"
+PPD="$DEST/PT-E850TKW.ppd"
+PLACEHOLDER="lpd://printer.invalid/BINARY_P1"
+KEYS="HalfCut FullCut Chain MirrorPrint LabelQuality PageSize"
+
+chown -R root:wheel "$DEST"
+chmod 755 "$DEST" "$DEST/rastertoptouch"
+chmod 644 "$PPD"
+
+# Bonjour: the host name of the first PT-E850TKW that answers within 4 seconds.
+discover() {
+    local tmp instance host
+    tmp="$(mktemp -d)"
+    /usr/bin/dns-sd -B _printer._tcp local. >"$tmp/browse" 2>&1 &
+    local pid=$!
+    sleep 4
+    kill "$pid" 2>/dev/null
+    instance="$(grep 'Add' "$tmp/browse" | grep 'PT-E850TKW' | head -1 | sed 's/.*_printer\._tcp\. *//')"
+    if [ -n "$instance" ]; then
+        /usr/bin/dns-sd -L "$instance" _printer._tcp local. >"$tmp/lookup" 2>&1 &
+        pid=$!
+        sleep 3
+        kill "$pid" 2>/dev/null
+        host="$(grep -o 'can be reached at [^ ]*' "$tmp/lookup" | head -1 | sed 's/can be reached at //; s/:[0-9]*$//; s/\.$//')"
+    fi
+    rm -rf "$tmp"
+    echo "$host"
+}
+
+URI=""
+SAVED=""
+if lpstat -p "$NAME" >/dev/null 2>&1; then
+    echo "queue exists: upgrading"
+    URI="$(lpstat -v "$NAME" | sed -n 's/^device for [^:]*: //p')"
+    # remember the driver settings (default choice is the one marked with *)
+    for key in $KEYS; do
+        value="$(lpoptions -p "$NAME" -l | sed -n "s|^$key/[^:]*: ||p" | tr ' ' '\n' | sed -n 's/^\*//p' | head -1)"
+        [ -n "$value" ] && SAVED="$SAVED $key=$value"
+    done
+    echo "kept settings:$SAVED"
+fi
+if [ -z "$URI" ] || [ "$URI" = "$PLACEHOLDER" ]; then
+    host="$(discover)"
+    if [ -n "$host" ]; then
+        URI="lpd://$host/BINARY_P1"
+        echo "found the printer: $host"
+    else
+        URI="$PLACEHOLDER"
+        echo "printer not found with Bonjour; address left empty"
+    fi
+fi
+
+if ! lpadmin -p "$NAME" -E -v "$URI" -P "$PPD" -D "Brother PT-E850TKW" -L "Label printer"; then
+    echo "lpadmin failed"
+    exit 1
+fi
+for setting in $SAVED; do
+    lpadmin -p "$NAME" -o "$setting" || echo "could not restore $setting"
+done
+echo "queue $NAME -> $URI"
+exit 0

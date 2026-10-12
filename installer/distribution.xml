@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<installer-gui-script minSpecVersion="2">
+    <title>PT-E850TKW</title>
+    <organization>vn.fiora</organization>
+    <welcome file="Welcome.html" mime-type="text/html"/>
+    <conclusion file="Conclusion.html" mime-type="text/html"/>
+    <options customize="never" require-scripts="false" hostArchitectures="arm64"/>
+    <domains enable_anywhere="false" enable_currentUserHome="false" enable_localSystem="true"/>
+    <choices-outline>
+        <line choice="default">
+            <line choice="vn.fiora.ptouch-e850.pkg"/>
+        </line>
+    </choices-outline>
+    <choice id="default"/>
+    <choice id="vn.fiora.ptouch-e850.pkg" visible="false">
+        <pkg-ref id="vn.fiora.ptouch-e850.pkg"/>
+    </choice>
+    <pkg-ref id="vn.fiora.ptouch-e850.pkg" version="__VERSION__" onConclusion="none">component.pkg</pkg-ref>
+</installer-gui-script>

@@ -4,7 +4,7 @@
 // settings and shows the printer's state through the Tauri commands in
 // src-tauri/src/main.rs. All text comes from i18n.js (Vietnamese or English).
 // Outside Tauri (a plain browser) it runs on made-up data so every state can be
-// looked at: ?m=ok|loi|dang-in|mat-ket-noi|chua-cai|tai   (&lang=en to force English)
+// looked at: ?m=ok|loi|dang-in|mat-ket-noi|chua-co-dia-chi|chua-cai|tai   (&lang=en to force English)
 
 const tauri = window.__TAURI__?.core;
 const params = new URLSearchParams(location.search);
@@ -54,6 +54,7 @@ const MOCK = {
     ok: { host: "192.168.99.107", status: { model: "PT-E850TKW", ready: true, state: "idle", tape_mm: 36, tape_supported: true }, error: null },
     loi: { host: "192.168.99.107", status: { model: "PT-E850TKW", ready: false, state: "error", tape_mm: 9, tape_supported: true }, error: null },
     "dang-in": { host: "192.168.99.107", status: { model: "PT-E850TKW", ready: false, state: "printing", tape_mm: 36, tape_supported: true }, error: null },
+    "chua-co-dia-chi": { host: null, status: null, error: null },
     "mat-ket-noi": { host: "192.168.99.107", status: null, error: "Cannot reach the printer at 192.168.99.107: SNMP receive timed out" },
   },
 };
@@ -107,8 +108,9 @@ function renderStatus() {
   }
   const st = info?.status;
   let tone = "none";
-  let title = t("st.noconn");
-  let sub = info?.host ? t("st.address", { host: info.host }) : t("st.noaddress");
+  const unset = info && !info.host && !info.error;
+  let title = unset ? t("st.none") : t("st.noconn");
+  let sub = info?.host ? t("st.address", { host: info.host }) : unset ? "" : t("st.noaddress");
   if (st) {
     sub = `${st.model} · ${info.host}`;
     const map = { idle: ["ok", "st.idle"], printing: ["busy", "st.printing"], error: ["bad", "st.error"], warmup: ["warn", "st.warmup"] };
@@ -137,6 +139,8 @@ function renderAlerts() {
   const st = info?.status;
   if (state.queueError) {
     out.push(banner("bad", "alert", t("b.noqueue.t"), t("b.noqueue.d")));
+  } else if (!state.loadingPrinter && !st && info && !info.host && !info.error) {
+    out.push(banner("warn", "warn", t("b.nohost.t"), t("b.nohost.d")));
   } else if (!state.loadingPrinter && !st) {
     out.push(banner("bad", "alert", t("b.noconn.t"), t("b.noconn.d", { detail: info?.error || t("b.noconn.none") }), { id: "refresh", label: t("b.retry") }));
   } else if (st?.state === "error") {

@@ -33,3 +33,6 @@ __pycache__/
 fixtures/captures/*.pcapng
 settings-app/src-tauri/target
 settings-app/src-tauri/gen
+
+# installer output
+/dist/

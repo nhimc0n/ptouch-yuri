@@ -64,6 +64,14 @@ pub struct PrinterInfo {
     pub error: Option<String>,
 }
 
+/// The placeholder host the installer gives the queue when it finds no printer
+/// (`.invalid` never resolves, RFC 6761).
+pub fn is_unset_address(host: &str) -> bool {
+    host.trim_end_matches('.')
+        .to_ascii_lowercase()
+        .ends_with(".invalid")
+}
+
 /// Read the queue's printer address and ask that printer for its state.
 /// Never fails: problems come back in `error` so the app can show them.
 pub fn read_printer(queue_name: &str) -> PrinterInfo {
@@ -77,6 +85,14 @@ pub fn read_printer(queue_name: &str) -> PrinterInfo {
             };
         }
     };
+    // The installer leaves this address when it could not find the printer.
+    if is_unset_address(&host) {
+        return PrinterInfo {
+            host: None,
+            status: None,
+            error: None,
+        };
+    }
     match read_status(&host) {
         Ok(status) => PrinterInfo {
             host: Some(host),
@@ -94,6 +110,14 @@ pub fn read_printer(queue_name: &str) -> PrinterInfo {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn placeholder_address_means_unset() {
+        assert!(is_unset_address("printer.invalid"));
+        assert!(is_unset_address("Printer.INVALID."));
+        assert!(!is_unset_address("BRWB4B5B6A16A36.local"));
+        assert!(!is_unset_address("192.168.99.106"));
+    }
 
     #[test]
     fn state_keywords() {
