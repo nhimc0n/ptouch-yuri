@@ -471,12 +471,19 @@ impl NetworkPrinter {
     /// Reads the SNMP device id (must be a PT-E850TKW) and the loaded media
     /// width from the web page. Sends nothing to the print queue.
     pub fn open(host: &str) -> Result<Self> {
-        let ip = (host, 0)
+        let addresses: Vec<std::net::IpAddr> = (host, 0)
             .to_socket_addrs()
             .map_err(|e| PtouchError::SendFailed(format!("cannot resolve {host}: {e}")))?
-            .next()
-            .ok_or_else(|| PtouchError::SendFailed(format!("cannot resolve {host}")))?
-            .ip();
+            .map(|addr| addr.ip())
+            .collect();
+        // A Bonjour name (BRW....local) can resolve to an IPv6 address first; the
+        // printer's services were only verified over IPv4, so prefer that.
+        let ip = addresses
+            .iter()
+            .find(|ip| ip.is_ipv4())
+            .or(addresses.first())
+            .copied()
+            .ok_or_else(|| PtouchError::SendFailed(format!("cannot resolve {host}")))?;
         Self::open_with(Endpoints::standard(ip))
     }
 

@@ -187,6 +187,12 @@ unapplied changes or the printer is not ready. The driver reinstall button was r
 Dev note: `cargo tauri dev` embeds `ui/` at compile time and does not reload it. After editing `ui/`, touch
 `src-tauri/src/main.rs` (or restart) or the window keeps showing the old UI.
 
+Printer address: the printer's IP changes (DHCP). The queue can use its Bonjour name instead, `BRWB4B5B6A16A36.local`
+(the printer advertises `_printer._tcp` as "Brother PT-E850TKW"; the name is BRW + its MAC, so it does not change). Checked
+2026-10-12: the name resolves to the current IP, `ptouch info --host <name>` and the app read it, and the queue's
+`lpd://` backend uses it. `NetworkPrinter::open` prefers IPv4 because a `.local` name may resolve to IPv6 first and SNMP
+over IPv6 is unverified. If a name ever fails to resolve, set a DHCP reservation on the router or type the IP in the app.
+
 Packaging (macOS 27): `cargo tauri build` fails with E0463 ("mis-aligned LINKEDIT string pool"): the linker writes proc-macro
 dylibs that `dlopen` rejects, intermittently. `[profile.release.build-override] opt-level = 0` in `src-tauri/Cargo.toml`
 reduces it. Recipe that worked (2026-10-08): `cd settings-app/src-tauri && cargo build --bins --features
